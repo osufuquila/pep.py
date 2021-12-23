@@ -2,6 +2,7 @@ import json
 import random
 import re
 import threading
+from typing import Callable
 
 import requests
 import time
@@ -18,9 +19,25 @@ from helpers import systemHelper
 from objects import fokabot
 from objects import glob
 from helpers import chatHelper as chat
-from common.web import cheesegull
 from datetime import datetime
 from datetime import timedelta
+
+commands = []
+
+def registerCommand(trigger: str, syntax: str = None, privs: privileges = None, resp: str = None):
+	"""A decorator to set commands into list."""
+	global commands
+	def wrapper(handler: Callable) -> Callable:
+		commands.append({
+			"trigger": trigger,
+			"callback": handler,
+			"syntax": syntax or "",
+			"privileges": privs or None,
+			"response": resp or ":thonk:"
+		})
+		return handler
+	return wrapper
+
 
 def chimuMessage(beatmapID):
 	beatmap = glob.db.fetch("SELECT song_name, beatmapset_id FROM beatmaps WHERE beatmap_id = %s LIMIT 1", [beatmapID])
@@ -44,384 +61,6 @@ def mirrorMessage(beatmapID):
 		beatmap["beatmapset_id"],
 		beatmap["beatmapset_id"],
 	)
-	
-"""
-Commands callbacks
-
-Must have fro, chan and messages as arguments
-:param fro: username of who triggered the command
-:param chan: channel"(or username, if PM) where the message was sent
-:param message: list containing arguments passed from the message
-				[0] = first argument
-				[1] = second argument
-				. . .
-
-return the message or **False** if there's no response by the bot
-TODO: Change False to None, because False doesn't make any sense
-"""
-def instantRestart(fro, chan, message):
-	glob.streams.broadcast("main", serverPackets.notification("We are restarting Bancho. Be right back!"))
-	systemHelper.scheduleShutdown(0, True, delay=5)
-	return False
-
-def faq(fro, chan, message):
-	# TODO: Unhardcode this
-	messages = {
-		"rules": "Please make sure to check (RealistikOsu! rules)[https://ussr.pl/doc/rules].",
-		"swearing": "You may swear but do not swear excessively.",
-		"spam": "Spamming is prohibited and may result in an automatic silence.",
-		"offend": "Attempt not to be offensive towards specific players.",
-		"github": "(RealistikOsu! Github page!)[https://github.com/RealistikOsu]",
-		"discord": "(Join RealistikOsu Discord!)[https://discord.gg/87E2K46]",
-		"changelog": "Check our (GitHub)[https://github.com/RealistikOsu] for changes!",
-		"english": "Please use the English language everywhere with the exception of private multis and dedicated language channels.",
-		"topic": "Can you please drop the topic and talk about something else?",
-		"cheating": "Hacking is not permitted on RealistikOsu! If you spot someone cheating, report them to us."
-	}
-	key = message[0].lower()
-	if key not in messages:
-		return False
-	return messages[key]
-
-def roll(fro, chan, message):
-	"""Rolls a number between 0 and 100 (or provided number)."""
-	maxPoints = 100
-	if len(message) >= 1:
-		if message[0].isdigit() and int(message[0]) > 0:
-			maxPoints = int(message[0])
-
-	points = random.randrange(0,maxPoints)
-	return "{} rolls {} points!".format(fro, str(points))
-
-#def ask(fro, chan, message):
-#	return random.choice(["yes", "no", "maybe"])
-
-def alert(fro, chan, message):
-	"""Sends a notification to all currently online members."""
-	msg = ' '.join(message[:]).strip()
-	if not msg:
-		return False
-	glob.streams.broadcast("main", serverPackets.notification(msg))
-	return False
-
-def alertUser(fro, chan, message):
-	"""Sends a notification to a specific user."""
-
-	target = message[0].lower()
-	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
-	if targetToken is not None:
-		msg = ' '.join(message[1:]).strip()
-		if not msg:
-			return False
-		targetToken.enqueue(serverPackets.notification(msg))
-		return False
-	else:
-		return "User offline."
-
-def moderated(fro, chan, message):
-	try:
-		# Make sure we are in a channel and not PM
-		if not chan.startswith("#"):
-			raise exceptions.moderatedPMException
-
-		# Get on/off
-		enable = True
-		if len(message) >= 1:
-			if message[0] == "off":
-				enable = False
-
-		# Turn on/off moderated mode
-		glob.channels.channels[chan].moderated = enable
-		return "This channel is {} in moderated mode!".format("now" if enable else "no longer")
-	except exceptions.moderatedPMException:
-		return "You are trying to put a private chat in moderated mode. Are you serious?!? You're fired."
-
-def kickAll(fro, chan, message):
-	"""Kicks all members from the server (except staff)."""
-	# Kick everyone but mods/admins
-	toKick = []
-	with glob.tokens:
-		for key, value in glob.tokens.tokens.items():
-			if not value.admin:
-				toKick.append(key)
-
-	# Loop though users to kick (we can't change dictionary size while iterating)
-	for i in toKick:
-		if i in glob.tokens.tokens:
-			glob.tokens.tokens[i].kick()
-
-	return "Whoops! Who needs players anyways?"
-
-def kick(fro, chan, message):
-	"""Kicks a specific member from the server."""
-	# Get parameters
-	target = message[0].lower()
-	if target == glob.BOT_NAME.lower():
-		return "Nope."
-
-	# Get target token and make sure is connected
-	tokens = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True, _all=True)
-	if len(tokens) == 0:
-		return "{} is not online".format(target)
-
-	# Kick users
-	for i in tokens:
-		i.kick()
-
-	# Bot response
-	return "{} has been kicked from the server.".format(target)
-
-def fokabotReconnect(fro, chan, message):
-	"""Forces the bot to reconnect."""
-	# Check if the bot is already connected
-	if glob.tokens.getTokenFromUserID(999) is not None:
-		return "{} is already connected to RealistikOsu!".format(glob.BOT_NAME)
-
-	# Bot is not connected, connect it
-	fokabot.connect()
-	return False
-
-def reload_commands(fro, chan, mes) -> str:
-	"""Reloads all of the RealistikBot commands."""
-
-	try:
-		fokabot.reload_commands()
-		return "RealistikBot has been reloaded successfully!"
-	except Exception as e:
-
-		return f"There has been an exception while reloading the bot: {e}"
-
-def silence(fro, chan, message):
-	"""Silences a specific user for a specific interval."""
-	message = [x.lower() for x in message]
-	target = message[0]
-	amount = message[1]
-	unit = message[2]
-	reason = ' '.join(message[3:]).strip()
-	if not reason:
-		return "Please provide a valid reason."
-	if not amount.isdigit():
-		return "The amount must be a number."
-
-	# Get target user ID
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-
-	# Make sure the user exists
-	if not targetUserID:
-		return "{}: user not found".format(target)
-
-	# Calculate silence seconds
-	if unit == 's':
-		silenceTime = int(amount)
-	elif unit == 'm':
-		silenceTime = int(amount) * 60
-	elif unit == 'h':
-		silenceTime = int(amount) * 3600
-	elif unit == 'd':
-		silenceTime = int(amount) * 86400
-	else:
-		return "Invalid time format (s/m/h/d)."
-
-	# Max silence time is 7 days
-	if silenceTime > 2.628e+6:
-		return "Invalid silence time. Max silence time is 1 month."
-
-	# Send silence packet to target if he's connected
-	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
-	if targetToken is not None:
-		# user online, silence both in db and with packet
-		targetToken.silence(silenceTime, reason, userID)
-	else:
-		# User offline, silence user only in db
-		userUtils.silence(targetUserID, silenceTime, reason, userID)
-
-	# Log message
-	msg = "{} has been silenced for: {}".format(target, reason)
-	return msg
-
-def removeSilence(fro, chan, message):
-	"""Unsilences a specific user."""
-	# Get parameters
-	for i in message:
-		i = i.lower()
-	target = message[0]
-
-	# Make sure the user exists
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-	if not targetUserID:
-		return "{}: user not found".format(target)
-
-	# Send new silence end packet to user if he's online
-	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
-	if targetToken is not None:
-		# User online, remove silence both in db and with packet
-		targetToken.silence(0, "", userID)
-	else:
-		# user offline, remove islene ofnlt from db
-		userUtils.silence(targetUserID, 0, "", userID)
-
-	return "{}'s silence reset".format(target)
-
-def ban(fro, chan, message):
-	"""Bans a specific user."""
-	# Get parameters
-	for i in message:
-		i = i.lower()
-	target = message[0]
-
-	# Make sure the user exists
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-	if not targetUserID:
-		return "{}: user not found".format(target)
-	if targetUserID in (999, 1000, 1001, 1002, 1005):
-		return "NO!"
-	# Set allowed to 0
-	userUtils.ban(targetUserID)
-
-	# Send ban packet to the user if he's online
-	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
-	if targetToken is not None:
-		targetToken.enqueue(serverPackets.loginBanned())
-
-	log.rap(userID, "has banned {}".format(target), True)
-	return "RIP {}. You will not be missed.".format(target)
-
-def unban(fro, chan, message):
-	"""Unans a specific user."""
-	# Get parameters
-	for i in message:
-		i = i.lower()
-	target = message[0]
-
-	# Make sure the user exists
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-	if not targetUserID:
-		return "{}: user not found".format(target)
-
-	# Set allowed to 1
-	userUtils.unban(targetUserID)
-
-	log.rap(userID, "has unbanned {}".format(target), True)
-	return "Welcome back {}!".format(target)
-
-def restrict(fro, chan, message):
-	"""Restricts a specific user."""
-	# Get parameters
-	for i in message:
-		i = i.lower()
-	target = message[0]
-
-	# Make sure the user exists
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-	if not targetUserID:
-		return "{}: user not found".format(target)
-	if targetUserID in (999, 1000):
-		return "NO!"
-		
-	# Put this user in restricted mode
-	userUtils.restrict(targetUserID)
-
-	# Send restricted mode packet to this user if he's online
-	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
-	if targetToken is not None:
-		targetToken.setRestricted()
-
-	log.rap(userID, "has put {} in restricted mode".format(target), True)
-	return "Bye bye {}. See you later, maybe.".format(target)
-
-def freeze(fro, chan, message):
-	"""Freezes a specific user."""
-	for i in message:
-		i = i.lower()
-	target = message[0]
-
-	# Make sure the user exists
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-	if not targetUserID:
-		return "{}: user not found".format(target)
-
-	# Get date & prepare freeze date
-	now = datetime.now()
-	freezedate = now + timedelta(days=2)
-	freezedateunix = (freezedate-datetime(1970,1,1)).total_seconds()
-
-	# Set freeze status & date
-	glob.db.execute("UPDATE `users`  SET `frozen` = '1' WHERE `id` = '{}'".format(targetUserID))
-	glob.db.execute("UPDATE `users`  SET `freezedate` = '{}' WHERE `id` = '{}'".format(freezedateunix, targetUserID))
-
-	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
-	if targetToken is not None:
-		targetToken.enqueue(serverPackets.notification("You have been frozen! The RealistikOsu staff team has found you suspicious and would like to request a liveplay. Visit ussr.pl for more info."))
-
-	log.rap(userID, "has frozen {}".format(target), True)
-	return "User has been frozen!"
-
-def unfreeze(fro, chan, message):
-	"""Unfreezes a specific user."""
-	for i in message:
-		i = i.lower()
-	target = message[0]
-
-	# Make sure the user exists
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-	if not targetUserID:
-		return "{}: user not found".format(target)
-
-	glob.db.execute("UPDATE `users`  SET `frozen` = '0' WHERE `id` = '{}'".format(targetUserID))
-	glob.db.execute("UPDATE `users`  SET `freezedate` = '0' WHERE `id` = '{}'".format(targetUserID))
-	glob.db.execute("UPDATE users  SET firstloginafterfrozen = '1' WHERE id = '{}'".format(targetUserID))
-	#glob.db.execute(f"INSERT IGNORE INTO user_badges (user, badge) VALUES ({targetUserID}), 1005)")
-
-	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
-	if targetToken is not None:
-		targetToken.enqueue(serverPackets.notification("Your account has been unfrozen! You have proven your legitemacy. Thank you and have fun playing on RealistikOsu!"))
-
-	log.rap(userID, "has unfrozen {}".format(target), True)
-	return "User has been unfrozen!"
-
-def changeUsername(fro, chan, message):
-	"""Lets you change your username."""
-	target = userUtils.safeUsername(fro)
-	new = message[0]
-	newl = message[0].lower()
-
-	targetUserID = userUtils.getIDSafe(target)
-
-	if not targetUserID:
-		return "{}: User not found".format(target)
-
-	tokens = glob.tokens.getTokenFromUserID(targetUserID, True)
-	glob.db.execute("UPDATE `users`  SET `username` = %s, `username_safe` = %s WHERE `id` = %s", (new, newl, targetUserID))
-	glob.db.execute("UPDATE `users_stats` SET `username` = %s WHERE `id` = %s", (new, targetUserID))
-	glob.db.execute("UPDATE `rx_stats` SET `username` = %s WHERE `id` = %s", (new, targetUserID))
-	glob.db.execute("UPDATE `ap_stats` SET `username` = %s WHERE `id` = %s", (new, targetUserID))
-	tokens[0].kick("Your username has been changed to {}. Please relog!".format(new))
-
-def unrestrict(fro, chan, message):
-	"""Unrestricts a specific user."""
-	# Get parameters
-	for i in message:
-		i = i.lower()
-	target = message[0]
-
-	# Make sure the user exists
-	targetUserID = userUtils.getIDSafe(target)
-	userID = userUtils.getID(fro)
-	if not targetUserID:
-		return "{}: user not found".format(target)
-
-	# Set allowed to 1
-	userUtils.unrestrict(targetUserID)
-
-	log.rap(userID, "has removed restricted mode from {}".format(target), True)
-	return "Welcome back {}!".format(target)
 
 def restartShutdown(restart):
 	"""Restart (if restart = True) or shutdown (if restart = False) pep.py safely"""
@@ -429,71 +68,25 @@ def restartShutdown(restart):
 	systemHelper.scheduleShutdown(5, restart, msg)
 	return msg
 
-def systemRestart(fro, chan, message):
-	return restartShutdown(True)
+def getMatchIDFromChannel(chan):
+	if not chan.lower().startswith("#multi_"):
+		raise exceptions.wrongChannelException()
+	parts = chan.lower().split("_")
+	if len(parts) < 2 or not parts[1].isdigit():
+		raise exceptions.wrongChannelException()
+	matchID = int(parts[1])
+	if matchID not in glob.matches.matches:
+		raise exceptions.matchNotFoundException()
+	return matchID
 
-def systemShutdown(fro, chan, message):
-	return restartShutdown(False)
-
-def systemReload(fro, chan, message):
-	glob.banchoConf.reload()
-	return "Bancho settings reloaded!"
-
-def systemMaintenance(fro, chan, message):
-	# Turn on/off bancho maintenance
-	maintenance = True
-
-	# Get on/off
-	if len(message) >= 2:
-		if message[1] == "off":
-			maintenance = False
-
-	# Set new maintenance value in bancho_settings table
-	glob.banchoConf.setMaintenance(maintenance)
-
-	if maintenance:
-		# We have turned on maintenance mode
-		# Users that will be disconnected
-		who = []
-
-		# Disconnect everyone but mod/admins
-		with glob.tokens:
-			for _, value in glob.tokens.tokens.items():
-				if not value.admin:
-					who.append(value.userID)
-
-		glob.streams.broadcast("main", serverPackets.notification("Our realtime server is in maintenance mode. Please try to login again later."))
-		glob.tokens.multipleEnqueue(serverPackets.loginError(), who)
-		msg = "The server is now in maintenance mode!"
-	else:
-		# We have turned off maintenance mode
-		# Send message if we have turned off maintenance mode
-		msg = "The server is no longer in maintenance mode!"
-
-	# Chat output
-	return msg
-
-def systemStatus(fro, chan, message):
-	"""Shows the current server status."""
-	# Fetch
-	data = systemHelper.getSystemInfo()
-	
-	msg = "\n".join((
-		"---> RealistikOsu <---",
-		" - Realtime Server -",
-		"> Running RealistikOsu pep.py fork.",
-		f"> Online Users: {data['connectedUsers']}",
-		f"> Multiplayer: {data['matches']}",
-		f"> Uptime: {data['uptime']}",
-		"",
-		" - System Statistics -",
-		f"> CPU Utilisation: {data['cpuUsage']}%",
-		f"> RAM Utilisation: {data['usedMemory']}/{data['totalMemory']}",
-		f"> CPU Utilisation History: {'%, '.join(data['loadAverage'])}"
-	))
-
-	return msg
-
+def getSpectatorHostUserIDFromChannel(chan):
+	if not chan.lower().startswith("#spect_"):
+		raise exceptions.wrongChannelException()
+	parts = chan.lower().split("_")
+	if len(parts) < 2 or not parts[1].isdigit():
+		raise exceptions.wrongChannelException()
+	userID = int(parts[1])
+	return userID
 
 def getPPMessage(userID, just_data = False):
 	"""Display PP stats for a map."""
@@ -564,7 +157,455 @@ def getPPMessage(userID, just_data = False):
 		# Unknown exception
 		# TODO: print exception
 	#	return False
+	
+"""
+Commands callbacks
 
+Must have fro, chan and messages as arguments
+:param fro: username of who triggered the command
+:param chan: channel"(or username, if PM) where the message was sent
+:param message: list containing arguments passed from the message
+				[0] = first argument
+				[1] = second argument
+				. . .
+
+return the message or **False** if there's no response by the bot
+TODO: Change False to None, because False doesn't make any sense
+"""
+@registerCommand(trigger= "!ir", privs= privileges.ADMIN_MANAGE_SERVERS)
+def instantRestart(fro, chan, message):
+	"""Reloads pep.py instantly."""
+	glob.streams.broadcast("main", serverPackets.notification("We are restarting Bancho. Be right back!"))
+	systemHelper.scheduleShutdown(0, True, delay=5)
+	return False
+
+@registerCommand(trigger= "!roll")
+def roll(fro, chan, message):
+	"""Rolls a number between 0 and 100 (or provided number)."""
+	maxPoints = 100
+	if len(message) >= 1:
+		if message[0].isdigit() and int(message[0]) > 0:
+			maxPoints = int(message[0])
+
+	points = random.randrange(0,maxPoints)
+	return "{} rolls {} points!".format(fro, str(points))
+
+@registerCommand(trigger= "!alert", syntax= "<message>", privs= privileges.ADMIN_SEND_ALERTS)
+def alert(fro, chan, message):
+	"""Sends a notification to all currently online members."""
+	msg = ' '.join(message[:]).strip()
+	if not msg:
+		return False
+	glob.streams.broadcast("main", serverPackets.notification(msg))
+	return False
+
+@registerCommand(trigger= "!alertuser", syntax= "<username> <message>", privs= privileges.ADMIN_SEND_ALERTS)
+def alertUser(fro, chan, message):
+	"""Sends a notification to a specific user."""
+
+	target = message[0].lower()
+	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
+	if targetToken is not None:
+		msg = ' '.join(message[1:]).strip()
+		if not msg:
+			return False
+		targetToken.enqueue(serverPackets.notification(msg))
+		return False
+	else:
+		return "User offline."
+
+@registerCommand(trigger= "!moderated", privs= privileges.ADMIN_CHAT_MOD)
+def moderated(fro, chan, message):
+	try:
+		# Make sure we are in a channel and not PM
+		if not chan.startswith("#"):
+			raise exceptions.moderatedPMException
+
+		# Get on/off
+		enable = True
+		if len(message) >= 1:
+			if message[0] == "off":
+				enable = False
+
+		# Turn on/off moderated mode
+		glob.channels.channels[chan].moderated = enable
+		return "This channel is {} in moderated mode!".format("now" if enable else "no longer")
+	except exceptions.moderatedPMException:
+		return "You are trying to put a private chat in moderated mode. Are you serious?!? You're fired."
+
+@registerCommand(trigger= "!kickall", privs= privileges.ADMIN_MANAGE_SERVERS)
+def kickAll(fro, chan, message):
+	"""Kicks all members from the server (except staff)."""
+	# Kick everyone but mods/admins
+	toKick = []
+	with glob.tokens:
+		for key, value in glob.tokens.tokens.items():
+			if not value.admin:
+				toKick.append(key)
+
+	# Loop though users to kick (we can't change dictionary size while iterating)
+	for i in toKick:
+		if i in glob.tokens.tokens:
+			glob.tokens.tokens[i].kick()
+
+	return "Whoops! Who needs players anyways?"
+
+@registerCommand(trigger= "!kick", syntax= "<target>", privs= privileges.ADMIN_KICK_USERS)
+def kick(fro, chan, message):
+	"""Kicks a specific member from the server."""
+	# Get parameters
+	target = message[0].lower()
+	if target == glob.BOT_NAME.lower():
+		return "Nope."
+
+	# Get target token and make sure is connected
+	tokens = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True, _all=True)
+	if len(tokens) == 0:
+		return "{} is not online".format(target)
+
+	# Kick users
+	for i in tokens:
+		i.kick()
+
+	# Bot response
+	return "{} has been kicked from the server.".format(target)
+
+@registerCommand(trigger= "!bot reconnect", privs= privileges.ADMIN_MANAGE_SERVERS)
+def fokabotReconnect(fro, chan, message):
+	"""Forces the bot to reconnect."""
+	# Check if the bot is already connected
+	if glob.tokens.getTokenFromUserID(999) is not None:
+		return "{} is already connected to RealistikOsu!".format(glob.BOT_NAME)
+
+	# Bot is not connected, connect it
+	fokabot.connect()
+	return False
+
+@registerCommand(trigger= "!bot reload", privs= privileges.ADMIN_MANAGE_SERVERS)
+def reload_commands(fro, chan, mes) -> str:
+	"""Reloads all of the RealistikBot commands."""
+
+	try:
+		fokabot.reload_commands()
+		return "RealistikBot has been reloaded successfully!"
+	except Exception as e:
+
+		return f"There has been an exception while reloading the bot: {e}"
+
+@registerCommand(trigger= "!silence", syntax= "<target> <amount> <unit(s/m/h/d)> <reason>", privs= privileges.ADMIN_SILENCE_USERS)
+def silence(fro, chan, message):
+	"""Silences a specific user for a specific interval."""
+	message = [x.lower() for x in message]
+	target = message[0]
+	amount = message[1]
+	unit = message[2]
+	reason = ' '.join(message[3:]).strip()
+	if not reason:
+		return "Please provide a valid reason."
+	if not amount.isdigit():
+		return "The amount must be a number."
+
+	# Get target user ID
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+
+	# Make sure the user exists
+	if not targetUserID:
+		return "{}: user not found".format(target)
+
+	# Calculate silence seconds
+	if unit == 's':
+		silenceTime = int(amount)
+	elif unit == 'm':
+		silenceTime = int(amount) * 60
+	elif unit == 'h':
+		silenceTime = int(amount) * 3600
+	elif unit == 'd':
+		silenceTime = int(amount) * 86400
+	else:
+		return "Invalid time format (s/m/h/d)."
+
+	# Max silence time is 7 days
+	if silenceTime > 2.628e+6:
+		return "Invalid silence time. Max silence time is 1 month."
+
+	# Send silence packet to target if he's connected
+	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
+	if targetToken is not None:
+		# user online, silence both in db and with packet
+		targetToken.silence(silenceTime, reason, userID)
+	else:
+		# User offline, silence user only in db
+		userUtils.silence(targetUserID, silenceTime, reason, userID)
+
+	# Log message
+	msg = "{} has been silenced for: {}".format(target, reason)
+	return msg
+
+@registerCommand(trigger= "!removesilence", syntax= "<target>", privs= privileges.ADMIN_SILENCE_USERS)
+def removeSilence(fro, chan, message):
+	"""Unsilences a specific user."""
+	# Get parameters
+	for i in message:
+		i = i.lower()
+	target = message[0]
+
+	# Make sure the user exists
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+	if not targetUserID:
+		return "{}: user not found".format(target)
+
+	# Send new silence end packet to user if he's online
+	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
+	if targetToken is not None:
+		# User online, remove silence both in db and with packet
+		targetToken.silence(0, "", userID)
+	else:
+		# user offline, remove islene ofnlt from db
+		userUtils.silence(targetUserID, 0, "", userID)
+
+	return "{}'s silence reset".format(target)
+
+@registerCommand(trigger= "!ban", syntax= "<target>", privs= privileges.ADMIN_BAN_USERS)
+def ban(fro, chan, message):
+	"""Bans a specific user."""
+	# Get parameters
+	for i in message:
+		i = i.lower()
+	target = message[0]
+
+	# Make sure the user exists
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+	if not targetUserID:
+		return "{}: user not found".format(target)
+	if targetUserID in (999, 1000, 1001, 1002, 1005):
+		return "NO!"
+	# Set allowed to 0
+	userUtils.ban(targetUserID)
+
+	# Send ban packet to the user if he's online
+	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
+	if targetToken is not None:
+		targetToken.enqueue(serverPackets.loginBanned())
+
+	log.rap(userID, "has banned {}".format(target), True)
+	return "RIP {}. You will not be missed.".format(target)
+
+@registerCommand(trigger= "!unban", syntax= "<target>", privs= privileges.ADMIN_BAN_USERS)
+def unban(fro, chan, message):
+	"""Unans a specific user."""
+	# Get parameters
+	for i in message:
+		i = i.lower()
+	target = message[0]
+
+	# Make sure the user exists
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+	if not targetUserID:
+		return "{}: user not found".format(target)
+
+	# Set allowed to 1
+	userUtils.unban(targetUserID)
+
+	log.rap(userID, "has unbanned {}".format(target), True)
+	return "Welcome back {}!".format(target)
+
+@registerCommand(trigger= "!restrict", syntax= "<target>", privs= privileges.ADMIN_BAN_USERS)
+def restrict(fro, chan, message):
+	"""Restricts a specific user."""
+	# Get parameters
+	for i in message:
+		i = i.lower()
+	target = message[0]
+
+	# Make sure the user exists
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+	if not targetUserID:
+		return "{}: user not found".format(target)
+	if targetUserID in (999, 1000):
+		return "NO!"
+		
+	# Put this user in restricted mode
+	userUtils.restrict(targetUserID)
+
+	# Send restricted mode packet to this user if he's online
+	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
+	if targetToken is not None:
+		targetToken.setRestricted()
+
+	log.rap(userID, "has put {} in restricted mode".format(target), True)
+	return "Bye bye {}. See you later, maybe.".format(target)
+
+@registerCommand(trigger= "!freeze", syntax= "<target>", privs= privileges.ADMIN_MANAGE_USERS)
+def freeze(fro, chan, message):
+	"""Freezes a specific user."""
+	for i in message:
+		i = i.lower()
+	target = message[0]
+
+	# Make sure the user exists
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+	if not targetUserID:
+		return "{}: user not found".format(target)
+
+	# Get date & prepare freeze date
+	now = datetime.now()
+	freezedate = now + timedelta(days=2)
+	freezedateunix = (freezedate-datetime(1970,1,1)).total_seconds()
+
+	# Set freeze status & date
+	glob.db.execute("UPDATE `users`  SET `frozen` = '1' WHERE `id` = '{}'".format(targetUserID))
+	glob.db.execute("UPDATE `users`  SET `freezedate` = '{}' WHERE `id` = '{}'".format(freezedateunix, targetUserID))
+
+	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
+	if targetToken is not None:
+		targetToken.enqueue(serverPackets.notification("You have been frozen! The RealistikOsu staff team has found you suspicious and would like to request a liveplay. Visit ussr.pl for more info."))
+
+	log.rap(userID, "has frozen {}".format(target), True)
+	return "User has been frozen!"
+
+@registerCommand(trigger= "!unfreeze", syntax= "<target>", privs= privileges.ADMIN_MANAGE_USERS)
+def unfreeze(fro, chan, message):
+	"""Unfreezes a specific user."""
+	for i in message:
+		i = i.lower()
+	target = message[0]
+
+	# Make sure the user exists
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+	if not targetUserID:
+		return "{}: user not found".format(target)
+
+	glob.db.execute("UPDATE `users`  SET `frozen` = '0' WHERE `id` = '{}'".format(targetUserID))
+	glob.db.execute("UPDATE `users`  SET `freezedate` = '0' WHERE `id` = '{}'".format(targetUserID))
+	glob.db.execute("UPDATE users  SET firstloginafterfrozen = '1' WHERE id = '{}'".format(targetUserID))
+	#glob.db.execute(f"INSERT IGNORE INTO user_badges (user, badge) VALUES ({targetUserID}), 1005)")
+
+	targetToken = glob.tokens.getTokenFromUsername(userUtils.safeUsername(target), safe=True)
+	if targetToken is not None:
+		targetToken.enqueue(serverPackets.notification("Your account has been unfrozen! You have proven your legitemacy. Thank you and have fun playing on RealistikOsu!"))
+
+	log.rap(userID, "has unfrozen {}".format(target), True)
+	return "User has been unfrozen!"
+
+@registerCommand(trigger= "!username", syntax= "<new username>", privs= privileges.USER_DONOR)
+def changeUsername(fro, chan, message):
+	"""Lets you change your username."""
+	target = userUtils.safeUsername(fro)
+	new = message[0]
+	newl = message[0].lower()
+
+	targetUserID = userUtils.getIDSafe(target)
+
+	if not targetUserID:
+		return "{}: User not found".format(target)
+
+	tokens = glob.tokens.getTokenFromUserID(targetUserID, True)
+	glob.db.execute("UPDATE `users`  SET `username` = %s, `username_safe` = %s WHERE `id` = %s", (new, newl, targetUserID))
+	glob.db.execute("UPDATE `users_stats` SET `username` = %s WHERE `id` = %s", (new, targetUserID))
+	glob.db.execute("UPDATE `rx_stats` SET `username` = %s WHERE `id` = %s", (new, targetUserID))
+	glob.db.execute("UPDATE `ap_stats` SET `username` = %s WHERE `id` = %s", (new, targetUserID))
+	tokens[0].kick("Your username has been changed to {}. Please relog!".format(new))
+
+@registerCommand(trigger= "!unrestrict", syntax= "<target>", privs= privileges.ADMIN_BAN_USERS)
+def unrestrict(fro, chan, message):
+	"""Unrestricts a specific user."""
+	# Get parameters
+	for i in message:
+		i = i.lower()
+	target = message[0]
+
+	# Make sure the user exists
+	targetUserID = userUtils.getIDSafe(target)
+	userID = userUtils.getID(fro)
+	if not targetUserID:
+		return "{}: user not found".format(target)
+
+	# Set allowed to 1
+	userUtils.unrestrict(targetUserID)
+
+	log.rap(userID, "has removed restricted mode from {}".format(target), True)
+	return "Welcome back {}!".format(target)
+
+@registerCommand(trigger= "!system restart", privs= privileges.ADMIN_MANAGE_SERVERS)
+def systemRestart(fro, chan, message):
+	return restartShutdown(True)
+
+@registerCommand(trigger= "!system shutdown", privs= privileges.ADMIN_MANAGE_SERVERS)
+def systemShutdown(fro, chan, message):
+	return restartShutdown(False)
+
+@registerCommand(trigger= "!system reload", privs= privileges.ADMIN_MANAGE_SERVERS)
+def systemReload(fro, chan, message):
+	glob.banchoConf.reload()
+	return "Bancho settings reloaded!"
+
+@registerCommand(trigger= "!system maintenance", privs= privileges.ADMIN_MANAGE_SERVERS)
+def systemMaintenance(fro, chan, message):
+	# Turn on/off bancho maintenance
+	maintenance = True
+
+	# Get on/off
+	if len(message) >= 2:
+		if message[1] == "off":
+			maintenance = False
+
+	# Set new maintenance value in bancho_settings table
+	glob.banchoConf.setMaintenance(maintenance)
+
+	if maintenance:
+		# We have turned on maintenance mode
+		# Users that will be disconnected
+		who = []
+
+		# Disconnect everyone but mod/admins
+		with glob.tokens:
+			for _, value in glob.tokens.tokens.items():
+				if not value.admin:
+					who.append(value.userID)
+
+		glob.streams.broadcast("main", serverPackets.notification("Our realtime server is in maintenance mode. Please try to login again later."))
+		glob.tokens.multipleEnqueue(serverPackets.loginError(), who)
+		msg = "The server is now in maintenance mode!"
+	else:
+		# We have turned off maintenance mode
+		# Send message if we have turned off maintenance mode
+		msg = "The server is no longer in maintenance mode!"
+
+	# Chat output
+	return msg
+
+@registerCommand(trigger= "!system status", privs= privileges.ADMIN_MANAGE_SERVERS)
+def systemStatus(fro, chan, message):
+	"""Shows the current server status."""
+	# Fetch
+	data = systemHelper.getSystemInfo()
+	
+	msg = "\n".join((
+		"---> RealistikOsu <---",
+		" - Realtime Server -",
+		"> Running RealistikOsu pep.py fork.",
+		f"> Online Users: {data['connectedUsers']}",
+		f"> Multiplayer: {data['matches']}",
+		f"> Uptime: {data['uptime']}",
+		"",
+		" - System Statistics -",
+		f"> CPU Utilisation: {data['cpuUsage']}%",
+		f"> RAM Utilisation: {data['usedMemory']}/{data['totalMemory']}",
+		f"> CPU Utilisation History: {'%, '.join(data['loadAverage'])}"
+	))
+
+	return msg
+
+@registerCommand(trigger= "\x01ACTION is playing")
+@registerCommand(trigger= "\x01ACTION is listening to")
+@registerCommand(trigger= "\x01ACTION is watching")
 def tillerinoNp(fro, chan, message):
 	"""Displays PP stats for a specific map."""
 	try:
@@ -605,8 +646,7 @@ def tillerinoNp(fro, chan, message):
 		if playWatch:
 			for part in message:
 				part = part.replace("\x01", "")
-				if part in mapping.keys():
-					modsEnum += mapping[part]
+				modsEnum += mapping.get(part, 0)
 
 		# Reject regex. Return to monkey.
 		beatmapID = beatmapURL.split("/")[-1]
@@ -650,31 +690,25 @@ def tillerinoMods(fro, chan, message):
 		for i in modsList:
 			if i not in ["NO", "NF", "EZ", "HD", "HR", "DT", "HT", "NC", "FL", "SO", "RX", "AP"]:
 				return "Invalid mods. Allowed mods: NO, NF, EZ, HD, HR, DT, HT, NC, FL, SO, RX, AP. Do not use spaces for multiple mods."
-			if i == "NO":
-				modsEnum = 0
+			
+			mods = {
+				"NO": 0,
+				"NF": mods.NOFAIL,
+				"EZ": mods.EASY,
+				"HD": mods.HIDDEN,
+				"HR": mods.HARDROCK,
+				"DT": mods.DOUBLETIME,
+				"HT": mods.HALFTIME,
+				"NC": mods.NIGHTCORE,
+				"FL": mods.FLASHLIGHT,
+				"SO": mods.SPUNOUT,
+				"RX": mods.RELAX,
+				"AP": mods.RELAX2
+			}.get(i, 0)
+
+			modsEnum += mods
+			if mods == 0:
 				break
-			elif i == "NF":
-				modsEnum += mods.NOFAIL
-			elif i == "EZ":
-				modsEnum += mods.EASY
-			elif i == "HD":
-				modsEnum += mods.HIDDEN
-			elif i == "HR":
-				modsEnum += mods.HARDROCK
-			elif i == "DT":
-				modsEnum += mods.DOUBLETIME
-			elif i == "HT":
-				modsEnum += mods.HALFTIME
-			elif i == "NC":
-				modsEnum += mods.NIGHTCORE
-			elif i == "FL":
-				modsEnum += mods.FLASHLIGHT
-			elif i == "SO":
-				modsEnum += mods.SPUNOUT
-			elif i == "RX":
-				modsEnum += mods.RELAX
-			elif i == "AP":
-				modsEnum += mods.RELAX2
 
 		# Set mods
 		token.tillerino[1] = modsEnum
@@ -684,6 +718,7 @@ def tillerinoMods(fro, chan, message):
 	except:
 		return False
 
+@registerCommand(trigger= "!acc", syntax= "<accuracy>")
 def tillerinoAcc(fro, chan, message):
 	"""Displays the PP stats for a specific map with a specific accuracy."""
 	try:
@@ -714,6 +749,7 @@ def tillerinoAcc(fro, chan, message):
 	except:
 		return False
 
+@registerCommand(trigger= "!last")
 def tillerinoLast(fro, chan, message):
 	try:
 		# Run the command in PM only
@@ -780,6 +816,7 @@ def tillerinoLast(fro, chan, message):
 		log.error(a)
 		return False
 
+@registerCommand(trigger= "!pp")
 def pp(fro, chan, message):
 	if chan.startswith("#"):
 		return False
@@ -808,30 +845,7 @@ def pp(fro, chan, message):
 	pp = userUtils.getPP(token.userID, gameMode)
 	return "You have {:,} pp".format(pp)
 
-def updateBeatmap(fro, chan, message):
-	try:
-		# Run the command in PM only
-		if chan.startswith("#"):
-			return False
-
-		# Get token and user ID
-		token = glob.tokens.getTokenFromUsername(fro)
-		if token is None:
-			return False
-
-		# Make sure the user has triggered the bot with /np command
-		if token.tillerino[0] == 0:
-			return "You must firstly select a beatmap using the /np command."
-
-		# Send the request to cheesegull
-		ok, message = cheesegull.updateBeatmap(token.tillerino[0])
-		if ok:
-			return "An update request for that beatmap has been queued. Check back in a few minutes and the beatmap should be updated!"
-		else:
-			return "Error in beatmap mirror API request: {}".format(message)
-	except:
-		return False
-
+@registerCommand(trigger= "!report")
 def report(fro, chan, message):
 	"""Reports a specific user."""
 	msg = ""
@@ -896,26 +910,7 @@ def report(fro, chan, message):
 					token.enqueue(serverPackets.notification(msg))
 	return False
 
-def getMatchIDFromChannel(chan):
-	if not chan.lower().startswith("#multi_"):
-		raise exceptions.wrongChannelException()
-	parts = chan.lower().split("_")
-	if len(parts) < 2 or not parts[1].isdigit():
-		raise exceptions.wrongChannelException()
-	matchID = int(parts[1])
-	if matchID not in glob.matches.matches:
-		raise exceptions.matchNotFoundException()
-	return matchID
-
-def getSpectatorHostUserIDFromChannel(chan):
-	if not chan.lower().startswith("#spect_"):
-		raise exceptions.wrongChannelException()
-	parts = chan.lower().split("_")
-	if len(parts) < 2 or not parts[1].isdigit():
-		raise exceptions.wrongChannelException()
-	userID = int(parts[1])
-	return userID
-
+@registerCommand(trigger= "!mp", syntax= "<subcommand>", privs= privileges.USER_TOURNAMENT_STAFF)
 def multiplayer(fro, chan, message):
 	"""All the multiplayer subcommands."""
 	def mpMake():
@@ -1279,6 +1274,7 @@ def multiplayer(fro, chan, message):
 	except:
 		raise
 
+@registerCommand(trigger= "!switchserver", syntax= "<server_url>", privs= privileges.ADMIN_MANAGE_SERVERS)
 def switchServer(fro, chan, message):
 	# Get target user ID
 	target = message[0]
@@ -1299,60 +1295,14 @@ def switchServer(fro, chan, message):
 	# Disconnect the user from the origin server
 	# userToken.kick()
 	return "{} has been connected to {}".format(target, newServer)
-	
+
+@registerCommand(trigger= "!announce", syntax= "<announcement>", privs= privileges.ADMIN_SEND_ALERTS)
 def postAnnouncement(fro, chan, message): # Post to #announce ingame
 	announcement = ' '.join(message[0:])
 	chat.sendMessage(glob.BOT_NAME, "#announce", announcement)
 	return "Announcement successfully sent."
 
-def usePPBoard(fro, chan, message):
-	messages = [m.lower() for m in message]
-	relax = message[0]
-
-	userID = userUtils.getID(fro)
-
-	if 'x' in relax:
-		rx = True
-	else:
-		rx = False
-
-	# Set PPBoard value in user_stats table
-	userUtils.setPPBoard(userID, rx)
-	return "You're using PPBoard in {rx}.".format(rx='relax' if rx else 'vanilla')
-
-def useScoreBoard(fro, chan, message):
-	messages = [m.lower() for m in message]
-	relax = message[0]
-
-	userID = userUtils.getID(fro)
-	
-	if 'x' in relax:
-		rx = True
-	else:
-		rx = False
-
-	# Set PPBoard value in user_stats table
-	userUtils.setScoreBoard(userID, rx)
-	return "You're using Scoreboard in {rx}.".format(rx='relax' if rx else 'vanilla')
-
-def whitelistUserPPLimit(fro, chan, message):
-	messages = [m.lower() for m in message]
-	target = message[0]
-	relax = message[1]
-
-	userID = userUtils.getID(target)
-
-	if userID == 0:
-		return "That user does not exist."
-
-	if 'x' in relax:
-		rx = True
-	else:
-		rx = False
-
-	userUtils.whitelistUserPPLimit(userID, rx)
-	return "{user} has been whitelisted from autorestrictions on {rx}.".format(user=target, rx='relax' if rx else 'vanilla')
-	
+@registerCommand(trigger= "!chimu")
 def chimu(fro, chan, message):
 	"""Gets a download URL for the beatmap from Chimu."""
 	try:
@@ -1375,6 +1325,7 @@ def chimu(fro, chan, message):
 		beatmapID = spectatorHostToken.beatmapID
 	return chimuMessage(beatmapID)
 
+@registerCommand(trigger= "!beatconnect")
 def beatconnect(fro, chan, message):
 	"""Gets a download URL for the beatmap from Beatconnect."""
 	try:
@@ -1397,6 +1348,7 @@ def beatconnect(fro, chan, message):
 		beatmapID = spectatorHostToken.beatmapID
 	return beatconnectMessage(beatmapID)
 
+@registerCommand(trigger= "!mirror")
 def mirror(fro, chan, message):
 	try:
 		matchID = getMatchIDFromChannel(chan)
@@ -1418,6 +1370,7 @@ def mirror(fro, chan, message):
 		beatmapID = spectatorHostToken.beatmapID
 	return mirrorMessage(beatmapID)
 
+@registerCommand(trigger= "!crash", syntax= "<target>", privs= privileges.ADMIN_MANAGE_USERS)
 def crashuser(fro, chan, message):
 	"""Crashes the persons game lmfao"""
 	#talnacialex found this he is good lad
@@ -1431,6 +1384,7 @@ def crashuser(fro, chan, message):
 	targetToken.enqueue(serverPackets.crash())
 	return ":^)"
 
+@registerCommand(trigger= "!bless", syntax= "<target>", privs= privileges.ADMIN_MANAGE_USERS)
 def bless(fro: str, chan: str, message: str) -> str:
 	"""Blesses them with the holy texts, and then proceeds to crash their game
 	because the bible is chonky. Oh yeah this is also expensive CPU, Memory wise
@@ -1447,7 +1401,7 @@ def bless(fro: str, chan: str, message: str) -> str:
 		return f"THE SACRED TEXTS COULD NOT BE ACQUIRED DUE TO THE DEVIL INTRODUCING ERROR {e}!!!"
 	
 	# Split the bible into 2000 char chunks (str writer and reader limit)
-	bible_split = [holy_bible [i:i+2000] for i in range(0, len(holy_bible ), 2000)]
+	bible_split = [holy_bible [i:i+2000] for i in range(0, len(holy_bible), 2000)]
 	
 	# Use bytearray for speed
 	q = bytearray()
@@ -1455,191 +1409,8 @@ def bless(fro: str, chan: str, message: str) -> str:
 		q += serverPackets.sendMessage("Jesus", t_user.username, b)
 	t_user.enqueue(q)
 	return "THEY ARE BLESSED AND ASCENDED TO HeAVeN"
-	
-"""
-Commands list
 
-trigger: message that triggers the command
-callback: function to call when the command is triggered. Optional.
-response: text to return when the command is triggered. Optional.
-syntax: command syntax. Arguments must be separated by spaces (eg: <arg1> <arg2>)
-privileges: privileges needed to execute the command. Optional.
-"""
-commands = [
-	{
-		"trigger": "!roll",
-		"callback": roll
-	},{
-		"trigger": "!report",
-		"callback": report
-	},{
-		"trigger": "!announce",
-		"syntax": "<announcement>",
-		"privileges": privileges.ADMIN_SEND_ALERTS,
-		"callback": postAnnouncement
-	},
-	{
-		"trigger": "!alert",
-		"syntax": "<message>",
-		"privileges": privileges.ADMIN_SEND_ALERTS,
-		"callback": alert
-	}, {
-		"trigger": "!alertuser",
-		"syntax": "<username> <message>",
-		"privileges": privileges.ADMIN_SEND_ALERTS,
-		"callback": alertUser,
-	}, {
-		"trigger": "!moderated",
-		"privileges": privileges.ADMIN_CHAT_MOD,
-		"callback": moderated
-	}, {
-		"trigger": "!kickall",
-		"privileges": privileges.ADMIN_MANAGE_SERVERS,
-		"callback": kickAll
-	}, {
-		"trigger": "!kick",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_KICK_USERS,
-		"callback": kick
-	}, {
-		"trigger": "!bot reconnect",
-		"privileges": privileges.ADMIN_MANAGE_SERVERS,
-		"callback": fokabotReconnect
-	}, {
-		"trigger": "!silence",
-		"syntax": "<target> <amount> <unit(s/m/h/d)> <reason>",
-		"privileges": privileges.ADMIN_SILENCE_USERS,
-		"callback": silence
-	}, {
-		"trigger": "!removesilence",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_SILENCE_USERS,
-		"callback": removeSilence
-	}, {
-		"trigger": "!system restart",
-		"privileges": privileges.ADMIN_MANAGE_SERVERS,
-		"callback": systemRestart
-	}, {
-		"trigger": "!system shutdown",
-		"privileges": privileges.ADMIN_MANAGE_SERVERS,
-		"callback": systemShutdown
-	}, {
-		"trigger": "!system reload",
-		"privileges": privileges.ADMIN_MANAGE_SETTINGS,
-		"callback": systemReload
-	}, {
-		"trigger": "!system maintenance",
-		"privileges": privileges.ADMIN_MANAGE_SERVERS,
-		"callback": systemMaintenance
-	}, {
-		"trigger": "!system status",
-		"privileges": privileges.ADMIN_MANAGE_SERVERS,
-		"callback": systemStatus
-	}, {
-		"trigger": "!ban",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_BAN_USERS,
-		"callback": ban
-	}, {
-		"trigger": "!unban",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_BAN_USERS,
-		"callback": unban
-	}, {
-		"trigger": "!restrict",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_BAN_USERS,
-		"callback": restrict
-	}, {
-		"trigger": "!freeze",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_MANAGE_USERS,
-		"callback": freeze
-	}, {
-		"trigger": "!unfreeze",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_MANAGE_USERS,
-		"callback": unfreeze
-	},
-	{
-		"trigger" : "!crash",
-		"syntax" : "<target>",
-		"privileges": privileges.ADMIN_MANAGE_USERS,
-		"callback": crashuser
-	},
-	{
-		"trigger": "!bless",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_MANAGE_USERS,
-		"callback": bless
-	},
-	{
-		"trigger": "!unrestrict",
-		"syntax": "<target>",
-		"privileges": privileges.ADMIN_BAN_USERS,
-		"callback": unrestrict
-	}, {
-		"trigger": "\x01ACTION is listening to",
-		"callback": tillerinoNp
-	}, {
-		"trigger": "\x01ACTION is playing",
-		"callback": tillerinoNp
-	}, {
-		"trigger": "\x01ACTION is watching",
-		"callback": tillerinoNp
-	}, {
-		"trigger": "!with",
-		"callback": tillerinoMods,
-		"syntax": "<mods>"
-	}, {
-		"trigger": "!last",
-		"callback": tillerinoLast
-	}, {
-		"trigger": "!ir",
-		"privileges": privileges.ADMIN_MANAGE_SERVERS,
-		"callback": instantRestart
-	}, {
-		"trigger": "!pp",
-		"callback": pp
-	}, {
-		"trigger": "!update",
-		"callback": updateBeatmap
-	}, {
-		"trigger": "!mp",
-		"privileges": privileges.USER_TOURNAMENT_STAFF,
-		"syntax": "<subcommand>",
-		"callback": multiplayer
-	},{
-		"trigger": "!username",
-		"syntax": "<new username>",
-		"privileges": privileges.USER_DONOR,
-		"callback": changeUsername
-	}, {
-		"trigger": "!chimu",
-		"callback": chimu
-	},
-	{
-		"trigger": "!beatconnect",
-		"callback": beatconnect
-	},
-	{
-		"trigger": "!mirrors",
-		"callback": mirror
-	},
-	{
-		"trigger": "!acc",
-		"callback": tillerinoAcc,
-		"syntax": "<accuarcy>"
-	},
-	{
-		"trigger": "!botreload",
-		"callback": reload_commands,
-		"privileges": privileges.ADMIN_MANAGE_SERVERS
-	}
-]
-
-# Weird placement, but /shrug
-
+@registerCommand(trigger= "!help")
 def help_cmd(fro, chan, message):
 	"""Lists all currently available commands!"""
 
@@ -1659,18 +1430,3 @@ def help_cmd(fro, chan, message):
 		help_cmd += f" - {name} - {docstr}\n"
 	
 	return help_cmd
-
-# Manually add it ig.
-commands.append(
-	{
-		"trigger": "!help",
-		"callback": help_cmd
-	}
-)
-
-# Commands list default values
-for cmd in commands:
-	cmd.setdefault("syntax", "")
-	cmd.setdefault("privileges", None)
-	cmd.setdefault("callback", None)
-	cmd.setdefault("response", ":thonk:")
