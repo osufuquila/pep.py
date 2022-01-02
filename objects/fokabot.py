@@ -1,7 +1,7 @@
 """FokaBot related functions"""
-import re
 
-from common import generalUtils
+import traceback
+import time
 from common.constants import actions
 from common.ripple import userUtils
 from constants import fokabotCommands
@@ -52,30 +52,53 @@ def fokabotResponse(fro, chan, message):
 	:param message: chat mesage
 	:return: FokaBot's response or False if no response
 	"""
-	for i in fokabotCommands.commands:
-		# Loop though all commands
-		if re.compile("^{}( (.+)?)?$".format(i["trigger"])).match(message.strip()):
-			# message has triggered a command
+	DEFAULT_RESPONSE = (
+		f"Hello I'm {glob.BOT_NAME}! The server's official bot to assist you, "
+		"if you want to know what I can do just type !help"
+	)
+	start = time.perf_counter_ns()
 
-			# Make sure the user has right permissions
-			if i["privileges"] is not None:
-				# Rank = x
-				if userUtils.getPrivileges(userUtils.getID(fro)) & i["privileges"] == 0:
-					return False
+	# This check is neccessary with ripple.
+	if fro == glob.BOT_NAME:
+		return False # FUCK OFF
+	
+	user = glob.tokens.getTokenFromUsername(fro)
+	assert len(message) > 0
 
-			# Check argument number
-			message = message.split(" ")
-			if i["syntax"] != "" and len(message) <= len(i["syntax"].split(" ")):
-				return "Wrong syntax: {} {}".format(i["trigger"], i["syntax"])
+	if message[0] not in ("!", "\x01") and not chan.startswith("#"):
+		return DEFAULT_RESPONSE
 
-			# Return response or execute callback
-			try:
-				if i["callback"] is None:
-					return i["response"]
-				else:
-					return i["callback"](fro, chan, message[1:])
-			except Exception as e:
-				log.error(f"There was an exception executing command '{message}'. Exception {e}.")
+	for regex, cmd in fokabotCommands.commands.items():
+		if not regex.match(message):
+			continue
 
-	# No commands triggered
+		args = message.removeprefix(cmd.trigger).strip().split(" ")
+		if cmd.privileges and not \
+			user.privileges & cmd.privileges:
+			return False
+
+		if cmd.syntax and not len(args) >= len(cmd.syntax.split(" ")):
+			return f"Wrong syntax: {cmd.trigger} {cmd.syntax}"
+		
+		try:
+			# Now we're executing command callback.
+			if not (resp := cmd.callback(fro, chan, args)):
+				return False
+
+			resp = [resp]
+			if user.admin: # I'm addicted to benchmarking lmao -len4ee
+				resp.append(f"Elasped: {(time.perf_counter_ns() - start) / 1e6:.2f}ms")
+
+			return " | ".join(resp)
+		except Exception:
+			# If exception happens, handle it well.
+			tb = traceback.format_exc()
+			log.error(f"There was an issue while running '{cmd.trigger}' command. \nTraceback: {tb}")
+			resp = ["There was issue while processing your command, please report this to RealistikOsu developer!"]
+			# Debugging for staff
+			if user.admin:
+				resp.append(tb)
+				resp.append(f"Elasped: {(time.perf_counter_ns() - start) / 1e6:.2f}ms")
+			return "\n".join(resp)
+
 	return False

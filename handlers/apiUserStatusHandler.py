@@ -3,7 +3,6 @@ import json
 import tornado.web
 import tornado.gen
 
-from common.sentry import sentry
 from common.ripple import userUtils
 from common.web import requestsManager
 from constants import exceptions
@@ -14,7 +13,6 @@ import random
 class handler(requestsManager.asyncRequestHandler):
     @tornado.web.asynchronous
     @tornado.gen.engine
-    @sentry.captureTornado
     def asyncGet(self):
         #here we fetch the user id
         try:

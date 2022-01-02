@@ -7,16 +7,16 @@ class handler(generalPubSubHandler.generalPubSubHandler):
     def __init__(self):
         super().__init__()
         self.structure = {
-            "username": "",
+            "to": "",
             "message": ""
         }
     
     def handle(self, data):
-        data = super().parseData(data)
-        if data is None: return
+        handler_data = super().parseData(data)
+        if handler_data is None: return
 
         chatHelper.sendMessage(
-            glob.BOT_NAME,
-            data["username"],
-            data["message"],
+            fro= glob.BOT_NAME,
+            to= handler_data["to"].encode("latin-1").decode("utf-8"),
+            message= handler_data["message"].encode("latin-1").decode("utf-8")
         )

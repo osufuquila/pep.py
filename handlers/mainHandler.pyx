@@ -56,7 +56,6 @@ from events import tournamentJoinMatchChannelEvent
 from events import tournamentLeaveMatchChannelEvent
 from helpers import packetHelper
 from objects import glob
-from common.sentry import sentry
 
 # Placing this here so we do not have to register this every conn.
 
@@ -121,12 +120,7 @@ eventHandler = {
 class handler(requestsManager.asyncRequestHandler):
 	@tornado.web.asynchronous
 	@tornado.gen.engine
-	@sentry.captureTornado
 	def asyncPost(self):
-		# Track time if needed
-		if glob.outputRequestTime:
-			# Start time
-			st = datetime.datetime.now()
 
 		# Client's token string and request data
 		requestTokenString = self.request.headers.get("osu-token")
@@ -197,26 +191,15 @@ class handler(requestsManager.asyncRequestHandler):
 					if userToken.kicked:
 						glob.tokens.deleteToken(userToken)
 
-		if glob.outputRequestTime:
-			# End time
-			et = datetime.datetime.now()
-
-			# Total time:
-			tt = float((et.microsecond-st.microsecond)/1000)
-			log.debug("Request time: {}ms".format(tt))
-
 		# Send server's response to client
 		# We don't use token object because we might not have a token (failed login)
-		if glob.gzip:
-			# First, write the gzipped response
-			self.write(gzip.compress(responseData, int(glob.conf.config["server"]["gziplevel"])))
 
-			# Then, add gzip headers
-			self.add_header("Vary", "Accept-Encoding")
-			self.add_header("Content-Encoding", "gzip")
-		else:
-			# First, write the response
-			self.write(responseData)
+		# First, write the gzipped response
+		self.write(gzip.compress(responseData, glob.config.GZIP_LEVEL))
+
+		# Then, add gzip headers
+		self.add_header("Vary", "Accept-Encoding")
+		self.add_header("Content-Encoding", "gzip")
 
 		# Add all the headers AFTER the response has been written
 		self.set_status(200)

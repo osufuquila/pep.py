@@ -1,25 +1,17 @@
 import os
 import sys
-import threading
 from multiprocessing.pool import ThreadPool
 import tornado.gen
 import tornado.httpserver
 import tornado.ioloop
 import tornado.web
-from raven.contrib.tornado import AsyncSentryClient
 import redis
 
-import json
-import shutil
-
-from common import generalUtils, agpl
 from common.db import dbConnector
-from common.ddog import datadogClient
-from logger import log
+from logger import log, DEBUG
 from common.redis import pubSub
-from common.web import schiavo
 from handlers import apiFokabotMessageHandler
-from handlers import apiGetTheFuckOuttaHere
+from handlers import api_delta as deltaApi
 from handlers import apiIsOnlineHandler
 from handlers import apiOnlineUsersHandler
 from handlers import apiServerStatusHandler
@@ -28,11 +20,9 @@ from handlers import ciTriggerHandler
 from handlers import mainHandler
 from handlers import apiUserStatusHandler
 from handlers import apiAerisThing
-from helpers import configHelper
 from helpers import consoleHelper
 from helpers import systemHelper as system
 from objects import banchoConfig
-from objects import chatFilters
 from objects import fokabot
 from objects import glob
 from pubSubHandlers import changeUsernameHandler, setMainMenuIconHandler
@@ -45,13 +35,6 @@ from pubSubHandlers import updateStatsHandler
 from pubSubHandlers import refreshPrivsHandler
 from pubSubHandlers import changePassword
 from pubSubHandlers import bot_msg_handler
-
-# WE GOT DELTA.
-try:
-	from realistik import delta as deltaApi
-except ImportError:
-	log.info("Not using Realistik Delta implementation.")
-	from handlers import apiGetTheFuckOuttaHere as deltaApi
 
 def make_app():
 	return tornado.web.Application([
@@ -67,51 +50,11 @@ def make_app():
 		(r"/infos", apiAerisThing.handler)
 	])
 
-
-if __name__ == "__main__":
-	# AGPL license agreement
-	try:
-		agpl.check_license("ripple", "pep.py")
-	except agpl.LicenseError as e:
-		print(str(e))
-		sys.exit(1)
-
+def main():
+	"""A main function to execute code."""
 	try:
 		# Server start
 		consoleHelper.printServerStartHeader(True)
-
-		# Read config.ini
-		log.info("Loading config file... ")
-		glob.conf = configHelper.config("config.ini")
-
-		if glob.conf.default:
-			# We have generated a default config.ini, quit server
-			log.warning("config.ini not found. A default one has been generated.")
-			log.warning("Please edit your config.ini and run the server again.")
-			sys.exit()
-
-		# If we haven't generated a default config.ini, check if it's valid
-		if not glob.conf.checkConfig():
-			log.error("Invalid config.ini. Please configure it properly")
-			log.error("Delete your config.ini to generate a default one")
-			sys.exit()
-		else:
-			log.info("Complete!")
-
-		# Read additional config file
-		log.info("Loading additional config file... ")
-		try:
-			if not os.path.isfile(glob.conf.config["custom"]["config"]):
-				log.warning("Missing config file at {}; A default one has been generated at this location.".format(glob.conf.config["custom"]["config"]))
-				shutil.copy("common/default_config.json", glob.conf.config["custom"]["config"])
-
-			with open(glob.conf.config["custom"]["config"], "r") as f:
-				glob.conf.extra = json.load(f)
-
-			log.info("Complete!")
-		except:
-			log.error("Unable to load custom config at {}".format(glob.conf.config["custom"]["config"]))
-			sys.exit()
 
 		# Create data folder if needed
 		log.info("Checking folders... ")
@@ -121,30 +64,31 @@ if __name__ == "__main__":
 				os.makedirs(i, 0o770)
 		log.info("Complete!")
 
-		# Connect to db
+		# Connect to db and redis
 		try:
 			log.info("Connecting to MySQL database... ")
-			glob.db = dbConnector.db(glob.conf.config["db"]["host"], glob.conf.config["db"]["username"], glob.conf.config["db"]["password"], glob.conf.config["db"]["database"], int(glob.conf.config["db"]["workers"]))
-			log.info("Complete!")
-		except:
-			# Exception while connecting to db
-			log.error("Error while connection to database. Please check your config.ini and run the server again")
-			raise
+			glob.db = dbConnector.db(
+				glob.config.DB_HOST, 
+				glob.config.DB_USERNAME, 
+				glob.config.DB_PASSWORD, 
+				glob.config.DB_DATABASE, 
+				glob.config.DB_WORKERS
+			)
 
-		# Connect to redis
-		try:
 			log.info("Connecting to redis... ")
-			glob.redis = redis.Redis(glob.conf.config["redis"]["host"], glob.conf.config["redis"]["port"], glob.conf.config["redis"]["database"], glob.conf.config["redis"]["password"])
+			glob.redis = redis.Redis(
+				glob.config.REDIS_HOST, 
+				glob.config.REDIS_PORT, 
+				glob.config.REDIS_DB, 
+				glob.config.REDIS_PASSWORD
+			)
 			glob.redis.ping()
-			log.info("Complete!")
-		except:
+		except Exception:
 			# Exception while connecting to db
-			log.error("Error while connection to redis. Please check your config.ini and run the server again")
-			raise
+			log.error("Error while connection to database and redis. Please ensure your config and try again.")
 
 		# Empty redis cache
 		try:
-			# TODO: Make function or some redis meme
 			glob.redis.set("ripple:online_users", 0)
 			glob.redis.eval("return redis.call('del', unpack(redis.call('keys', ARGV[1])))", 0, "peppy:*")
 		except redis.exceptions.ResponseError:
@@ -152,7 +96,7 @@ if __name__ == "__main__":
 			pass
 
 		# Save peppy version in redis
-		glob.redis.set("peppy:version", glob.VERSION)
+		glob.redis.set("peppy:version", glob.__version__)
 
 		# Load bancho_settings
 		try:
@@ -171,18 +115,10 @@ if __name__ == "__main__":
 		# Create threads pool
 		try:
 			log.info("Creating threads pool... ")
-			glob.pool = ThreadPool(int(glob.conf.config["server"]["threads"]))
+			glob.pool = ThreadPool(glob.config.THREADS_COUNT)
 			log.info("Complete!")
 		except ValueError:
 			log.error("Error while creating threads pool. Please check your config.ini and run the server again")
-
-		try:
-			log.info("Loading chat filters... ")
-			glob.chatFilters = chatFilters.chatFilters()
-			log.info("Complete!")
-		except:
-			log.error("Error while loading chat filters. Make sure there is a filters.txt file present")
-			raise
 
 		# Start fokabot
 		log.info("Connecting RealistikBot...")
@@ -215,73 +151,15 @@ if __name__ == "__main__":
 		glob.matches.cleanupLoop()
 		log.info("Complete!")
 
-		# Localize warning
-		glob.localize = generalUtils.stringToBool(glob.conf.config["localize"]["enable"])
-		if not glob.localize:
-			log.warning("Users localization is disabled!")
-
-		# Discord
-		if generalUtils.stringToBool(glob.conf.config["discord"]["enable"]):
-			glob.schiavo = schiavo.schiavo(glob.conf.config["discord"]["boturl"], "**pep.py**")
-		else:
-			log.warning("Discord logging is disabled!")
-
-		# Gzip
-		glob.gzip = generalUtils.stringToBool(glob.conf.config["server"]["gzip"])
-		glob.gziplevel = int(glob.conf.config["server"]["gziplevel"])
-		if not glob.gzip:
-			log.warning("Gzip compression is disabled!")
-
 		# Debug mode
-		glob.debug = generalUtils.stringToBool(glob.conf.config["debug"]["enable"])
-		glob.outputPackets = generalUtils.stringToBool(glob.conf.config["debug"]["packets"])
-		glob.outputRequestTime = generalUtils.stringToBool(glob.conf.config["debug"]["time"])
-		if glob.debug:
-			log.warning("Server running in debug mode!")
+		glob.debug = DEBUG
+		if glob.debug: log.warning("Server running in debug mode!")
 
 		# Make app
 		glob.application = make_app()
 
-		# Set up sentry
-		try:
-			glob.sentry = generalUtils.stringToBool(glob.conf.config["sentry"]["enable"])
-			if glob.sentry:
-				glob.application.sentry_client = AsyncSentryClient(glob.conf.config["sentry"]["banchodsn"], release=glob.VERSION)
-			else:
-				log.warning("Sentry logging is disabled!")
-		except:
-			log.error("Error while starting sentry client! Please check your config.ini and run the server again")
-
-		# Set up datadog
-		try:
-			if generalUtils.stringToBool(glob.conf.config["datadog"]["enable"]):
-				glob.dog = datadogClient.datadogClient(
-					glob.conf.config["datadog"]["apikey"],
-					glob.conf.config["datadog"]["appkey"],
-					[
-						datadogClient.periodicCheck("online_users", lambda: len(glob.tokens.tokens)),
-						datadogClient.periodicCheck("multiplayer_matches", lambda: len(glob.matches.matches)),
-
-						#datadogClient.periodicCheck("ram_clients", lambda: generalUtils.getTotalSize(glob.tokens)),
-						#datadogClient.periodicCheck("ram_matches", lambda: generalUtils.getTotalSize(glob.matches)),
-						#datadogClient.periodicCheck("ram_channels", lambda: generalUtils.getTotalSize(glob.channels)),
-						#datadogClient.periodicCheck("ram_file_buffers", lambda: generalUtils.getTotalSize(glob.fileBuffers)),
-						#datadogClient.periodicCheck("ram_file_locks", lambda: generalUtils.getTotalSize(glob.fLocks)),
-						#datadogClient.periodicCheck("ram_datadog", lambda: generalUtils.getTotalSize(glob.datadogClient)),
-						#datadogClient.periodicCheck("ram_verified_cache", lambda: generalUtils.getTotalSize(glob.verifiedCache)),
-						#datadogClient.periodicCheck("ram_tornado", lambda: generalUtils.getTotalSize(glob.application)),
-						#datadogClient.periodicCheck("ram_db", lambda: generalUtils.getTotalSize(glob.db)),
-					])
-			else:
-				log.warning("Datadog stats tracking is disabled!")
-		except:
-			log.warning("Error while starting Datadog client! Please check your config.ini and run the server again")
-
-		# Server port
-		serverPort = int(glob.conf.config["server"]["port"])
-
 		# Server start message and console output
-		log.info(f"pep.py listening for HTTP(s) clients on 127.0.0.1:{serverPort}...")
+		log.info(f"pep.py listening for HTTP(s) clients on 127.0.0.1:{glob.config.PORT}...")
 
 		# Connect to pubsub channels
 		pubSub.listener(glob.redis, {
@@ -299,7 +177,11 @@ if __name__ == "__main__":
 		}).start()
 
 		# Start tornado
-		glob.application.listen(serverPort)
+		glob.application.listen(glob.config.PORT)
 		tornado.ioloop.IOLoop.instance().start()
 	finally:
 		system.dispose()
+
+
+if __name__ == "__main__":
+	main()

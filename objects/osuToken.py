@@ -482,15 +482,10 @@ class token:
 
 		:return:
 		"""
-		stats = userUtils.getUserStats(self.userID, self.gameMode)
-		stats_relax = userUtils.getUserStatsRx(self.userID, self.gameMode)
-		stats_ap = userUtils.getUserStatsAP(self.userID, self.gameMode)
-		log.debug(str(stats))
 		
-		if stats is None:
-			log.warning("Stats query returned None")
-			return
 		if self.relaxing:
+			stats_relax = userUtils.getUserStatsRx(self.userID, self.gameMode)
+			
 			self.gameRank = stats_relax["gameRank"]
 			self.pp = stats_relax["pp"]
 			self.rankedScore = stats_relax["rankedScore"]
@@ -499,6 +494,8 @@ class token:
 			self.totalScore = stats_relax["totalScore"]
 
 		elif self.autopiloting:
+			stats_ap = userUtils.getUserStatsAP(self.userID, self.gameMode)
+
 			self.gameRank = stats_ap["gameRank"]
 			self.pp = stats_ap["pp"]
 			self.rankedScore = stats_ap["rankedScore"]
@@ -506,6 +503,8 @@ class token:
 			self.playcount = stats_ap["playcount"]
 			self.totalScore = stats_ap["totalScore"]
 		else:
+			stats = userUtils.getUserStats(self.userID, self.gameMode)
+
 			self.gameRank = stats["gameRank"]
 			self.pp = stats["pp"]
 			self.rankedScore = stats["rankedScore"]

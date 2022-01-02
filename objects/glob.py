@@ -1,50 +1,34 @@
 """Global objects and variables"""
 
 import time
-from common.ddog import datadogClient
-from common.files import fileBuffer, fileLocks
-from objects import channelList
-from objects import matchList
-from objects import streamList
-from objects import tokenList
-from common.web import schiavo
+from collection.channels import ChannelList
+from collection.matches import MatchList
+from collection.streams import StreamList
+from collection.tokens import TokenList
+from config import conf
 
-try:
-	with open("version") as f:
-		VERSION = f.read().strip()
-	if VERSION == "":
-		raise Exception
-except:
-	VERSION = "Unknown"
-
+# Consts.
 DATADOG_PREFIX = "peppy"
 BOT_NAME = "RealistikBot"
+
+__version__ = "3.1.0"
+
 application = None
 db = None
 redis = None
-conf = None
+config = conf
 banchoConf = None
-tokens = tokenList.tokenList()
-channels = channelList.channelList()
-matches = matchList.matchList()
-fLocks = fileLocks.fileLocks()
-fileBuffers = fileBuffer.buffersList()
-schiavo = schiavo.schiavo()
-dog = datadogClient.datadogClient()
+streams = StreamList()
+tokens = TokenList()
+channels = ChannelList()
+matches = MatchList()
 verifiedCache = {}
+cached_passwords: dict = {}
 chatFilters = None
 pool = None
 busyThreads = 0
 
 debug = False
-outputRequestTime = False
-outputPackets = False
-gzip = False
-localize = False
-sentry = False
-irc = False
 restarting = False
 
 startTime = int(time.time())
-
-streams = streamList.streamList()

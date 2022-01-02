@@ -72,9 +72,6 @@ class banchoConfig:
 		# Reload channels too
 		glob.channels.loadChannels()
 
-		# And chat filters
-		glob.chatFilters.loadFilters()
-
 		# Send new channels and new bottom icon to everyone
 		glob.streams.broadcast("main", serverPackets.mainMenuIcon(glob.banchoConf.config["menuIcon"]))
 		glob.streams.broadcast("main", serverPackets.channelInfoEnd())

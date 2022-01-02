@@ -3,7 +3,7 @@ import logging
 from constants import exceptions
 from objects import glob
 
-class channel:
+class Channel:
 	def __init__(self, name, description, publicRead, publicWrite, temp, hidden):
 		"""
 		Create a new chat channel object

@@ -204,9 +204,6 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 		# Truncate message if > 2048 characters
 		message = message[:2048]+"..." if len(message) > 2048 else message
 
-		# Check for word filters
-		message = glob.chatFilters.filterMessage(message)
-
 		# Build packet bytes
 		packet = serverPackets.sendMessage(token.username, toClient, message)
 
@@ -273,8 +270,7 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 
 		# File and discord logs (public chat only)
 		if to.startswith("#") and not (message.startswith("\x01ACTION is playing") and to.startswith("#spect_")):
-			log.chat("{fro} @ {to}: {message}".format(fro=token.username, to=to, message=message.encode("latin-1").decode("utf-8")))
-			glob.schiavo.sendChatlog("**{fro} @ {to}:** {message}".format(fro=token.username, to=to, message=message.encode("latin-1").decode("utf-8")))
+			log.chat("{fro} @ {to}: {message}".format(fro=token.username, to=to, message=message.encode("utf-8").decode("utf-8")))
 		return 0
 	except exceptions.userSilencedException:
 		token.enqueue(serverPackets.silenceEndTime(token.getSilenceSecondsLeft()))
@@ -301,34 +297,3 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 	except exceptions.invalidArgumentsException:
 		log.warning("{} tried to send an invalid message to {}".format(token.username, to))
 		return 404
-
-
-""" IRC-Bancho Connect/Disconnect/Join/Part interfaces"""
-def fixUsernameForBancho(username):
-	"""
-	Convert username from IRC format (without spaces) to Bancho format (with spaces)
-
-	:param username: username to convert
-	:return: converted username
-	"""
-	# If there are no spaces or underscores in the name
-	# return it
-	if " " not in username and "_" not in username:
-		return username
-
-	# Exact match first
-	result = glob.db.fetch("SELECT id FROM users WHERE username = %s LIMIT 1", [username])
-	if result is not None:
-		return username
-
-	# Username not found, replace _ with space
-	return username.replace("_", " ")
-
-def fixUsernameForIRC(username):
-	"""
-	Convert an username from Bancho format to IRC format (underscores instead of spaces)
-
-	:param username: username to convert
-	:return: converted username
-	"""
-	return username.replace(" ", "_")

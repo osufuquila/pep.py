@@ -8,26 +8,14 @@ from common.ripple import userUtils
 from constants import exceptions
 from constants import serverPackets
 from helpers import chatHelper as chat
-from helpers import countryHelper
+from helpers import geo_helper
 from objects import glob
 from datetime import datetime
 from helpers.realistik_stuff import Timer
 from objects import glob
 import random
-
-# We have our own hashing things. We'd like to keep what they are a secret.
-# This is an issue with an open sec project, so we keep it in a private module.
-try: from realistik.user_utils import verify_password
-except ImportError:
-	log.warning("Using Ripple password hash!")
-	from common.ripple.userUtils import checkLogin as verify_password
-
-# Let people use this without our private module.
-try:
-	from realistik.localise import get_full
-except ImportError:
-	log.warning("Using RippleAPI geolocation.")
-	from helpers.locationHelper import get_full
+from helpers.user_helper import verify_password
+from helpers.geo_helper import get_full
 
 UNFREEZE_NOTIF = serverPackets.notification("Thank you for providing a liveplay! You have proven your legitemacy and have subsequently been unfrozen. Have fun playing RealistikOsu!")
 FREEZE_RES_NOTIF = serverPackets.notification("Your window for liveplay sumbission has expired! Your account has been restricted as per our cheating policy. Please contact staff for more information on what can be done. This can be done via the RealistikCentral Discord server.")
@@ -302,18 +290,10 @@ def handle(tornadoRequest):
 					responseToken.enqueue(serverPackets.userPanel(token.userID))
 
 		# Localise the user based off IP.
-		if glob.localize:
-			# Get location and country from IP
-			latitude, longitude, countryLetters = get_full(requestIP)
+		# Get location and country from IP
+		latitude, longitude, countryLetters = get_full(requestIP)
 
-			country = countryHelper.getCountryID(countryLetters)
-		else:
-			# Set location to 0,0 and get country from db
-			log.warning("Localisation of user skipped! If this was not intended, please check your pep.py configuration.")
-			latitude = 0
-			longitude = 0
-			countryLetters = "XX"
-			country = countryHelper.getCountryID(userUtils.getCountry(userID))
+		country = geo_helper.getCountryID(countryLetters)
 
 		# Set location and country
 		responseToken.setLocation(latitude, longitude)
@@ -334,9 +314,12 @@ def handle(tornadoRequest):
 		if userID in (4674, 3277): quote = "I lost an S because I saw her lewd"
 		# Ced also gets his own AS HE DOESNT WANT TO CHECK FAST SPEED.
 		elif userID == 1002: quote = "juSt Do iT"
+		# Me and relesto are getting one as well lmao. UPDATE: Sky and Aochi gets it too lmao.
+		elif userID in (1000, 1180, 3452, 4812): quote = (f"Hello I'm RealistikBot! The server's official bot to assist you, "
+												"if you want to know what I can do just type !help")
 		else: quote = random.choice(glob.banchoConf.config['Quotes'])
 		notif = f"""- Online Users: {online_users}\n- {quote}"""
-		if responseToken.admin: notif += f"\nAuthentication attempt took {t_str}!"
+		if responseToken.admin: notif += f"\n- Elapsed: {t_str}!"
 		responseToken.enqueue(serverPackets.notification(notif))
 		
 		log.info(f"Authentication attempt took {t_str}!")

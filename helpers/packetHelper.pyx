@@ -109,8 +109,9 @@ cpdef bytes packData(__data, int dataType):
 		else:
 			# Non empty string
 			data += b"\x0B"
-			data += uleb128Encode(len(__data))
-			data += str.encode(__data, "latin_1", "ignore")
+			s = str.encode(__data, "utf-8", "ignore")
+			data += uleb128Encode(len(s))
+			data += s
 	elif dataType == dataTypes.UINT16:
 		packType = "<H"
 	elif dataType == dataTypes.SINT16:

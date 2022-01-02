@@ -41,7 +41,6 @@ if userToken.matchID != -1 and userToken.actionID != actions.MULTIPLAYING and us
 
 	# Always update action id, text, md5 and beatmapID
 	userToken.actionID = packetData["actionID"]
-	#userToken.actionID = packetData["actionText"]
 	userToken.actionMd5 = packetData["actionMd5"]
 	userToken.actionMods = packetData["actionMods"]
 	userToken.beatmapID = packetData["beatmapID"]
@@ -52,28 +51,24 @@ if userToken.matchID != -1 and userToken.actionID != actions.MULTIPLAYING and us
 			if not userToken.relaxing: userToken.updateCachedStats()
 			userToken.relaxing = True
 			userToken.autopiloting = False
-			if userToken.actionID in (0, 1, 14):
-				userToken.actionText = packetData["actionText"] + "on Relax"
-			else:
-				userToken.actionText = packetData["actionText"] + " on Relax"
+			userToken.actionText = "[RX] " + packetData["actionText"]
+			userToken.updateCachedStats()
 		#autopiloten
 		elif packetData["actionMods"] & 8192:
 			# Only reload on mode change.
 			if not userToken.autopiloting: userToken.updateCachedStats()
 			userToken.autopiloting = True
 			userToken.relaxing = False
-			if userToken.actionID in (0, 1, 14):
-				userToken.actionText = packetData["actionText"] + "on Autopilot"
-			else:
-				userToken.actionText = packetData["actionText"] + " on Autopilot"
+			userToken.actionText = "[AP] " + packetData["actionText"]
 			userToken.updateCachedStats()
 		else:
 			if (not userToken.autopiloting) and (not userToken.relaxing):
 				userToken.updateCachedStats()
 			userToken.relaxing = False
 			userToken.autopiloting = False
-			userToken.actionText = packetData["actionText"]
+			userToken.actionText = "[VN] " + packetData["actionText"]
 			userToken.updateCachedStats()
+	
 	# Enqueue our new user panel and stats to us and our spectators
 	p = (
 		serverPackets.userPanel(userID)
@@ -85,4 +80,4 @@ if userToken.matchID != -1 and userToken.actionID != actions.MULTIPLAYING and us
 			glob.tokens.tokens[i].enqueue(p)
 
 	# Console output
-	log.info(f"{username} updated their presence! ({userToken.actionText})")
+	log.info(f"{username} updated their presence! [Action ID: {userToken.actionID} // Action Text: {userToken.actionText}]")

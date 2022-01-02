@@ -9,3 +9,4 @@ redis==2.10.5
 cython==0.29.23
 datadog==0.41.0
 colorama==0.4.4
+osupyparser
