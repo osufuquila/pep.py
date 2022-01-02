@@ -18,6 +18,7 @@ db = None
 redis = None
 config = conf
 banchoConf = None
+namespace = {}
 streams = StreamList()
 tokens = TokenList()
 channels = ChannelList()

@@ -7,6 +7,8 @@ from typing import Callable
 
 import requests
 import time
+import sys
+import pprint
 import osupyparser
 
 from common import generalUtils
@@ -44,20 +46,20 @@ def registerCommand(trigger: str, syntax: str = None, privs: privileges = None):
 	return wrapper
 
 def calc_completion(bmapid, n300, n100, n50, miss):
-    bmap = osupyparser.OsuFile(f"/home/RealistikOsu/USSR/.data/maps/{bmapid}.osu").parse_file()
+	bmap = osupyparser.OsuFile(f"/home/RealistikOsu/USSR/.data/maps/{bmapid}.osu").parse_file()
 
-    total_hits = int(n300 + n100 + n50 + miss)
+	total_hits = int(n300 + n100 + n50 + miss)
 
-    obj_total = total_hits - 1
-    n = len(bmap.hit_objects) - 1
+	obj_total = total_hits - 1
+	n = len(bmap.hit_objects) - 1
 
-    objs = []
-    for p in bmap.hit_objects: objs.append(p.start_time)
+	objs = []
+	for p in bmap.hit_objects: objs.append(p.start_time)
 
-    timing = int(objs[n]) - int(objs[0])
-    p = int(objs[obj_total]) - int(objs[0])
+	timing = int(objs[n]) - int(objs[0])
+	p = int(objs[obj_total]) - int(objs[0])
 
-    return (p / timing) * 100
+	return (p / timing) * 100
 
 def chimuMessage(beatmapID):
 	beatmap = glob.db.fetch("SELECT song_name, beatmapset_id FROM beatmaps WHERE beatmap_id = %s LIMIT 1", [beatmapID])
@@ -744,9 +746,9 @@ def tillerinoLast(fro, chan, message):
 		return "Please submit a score!"
 	
 	rank = generalUtils.getRank(
-        data["play_mode"], data["mods"], data["accuracy"],
-        data["300_count"], data["100_count"], data["50_count"], data["misses_count"]
-    ) if data["completed"] != 0 else 'F'
+		data["play_mode"], data["mods"], data["accuracy"],
+		data["300_count"], data["100_count"], data["50_count"], data["misses_count"]
+	) if data["completed"] != 0 else 'F'
 
 	
 	fc_acc = generalUtils.calc_acc(data["play_mode"], data["300_count"] + data["misses_count"], data["100_count"], data["50_count"], 0, data["katus_count"], data["gekis_count"])
@@ -858,7 +860,7 @@ def multiplayer(fro, chan, message):
 		if userToken is None:
 			raise exceptions.invalidArgumentsException(
 				"No game clients found for {}, can't join the match. "
-			    "If you're a referee and you want to join the chat "
+				"If you're a referee and you want to join the chat "
 				"channel from IRC, use /join #multi_{} instead.".format(fro, matchID)
 			)
 		userToken.joinMatch(matchID)
@@ -1185,7 +1187,7 @@ def multiplayer(fro, chan, message):
 			"mods": mpMods,
 			"team": mpTeam,
 			"settings": mpSettings,
-            "scorev": mpScoreV,
+			"scorev": mpScoreV,
 			"help": mpHelp
 		}
 		requestedSubcommand = message[0].lower().strip()
@@ -1331,6 +1333,36 @@ def bless(fro: str, chan: str, message: str) -> str:
 		q += serverPackets.sendMessage("Jesus", t_user.username, b)
 	t_user.enqueue(q)
 	return "THEY ARE BLESSED AND ASCENDED TO HeAVeN"
+
+@registerCommand(trigger= "!py", syntax= "<code>", privs= privileges.ADMIN_MANAGE_USERS)
+def py(fro: str, chan: str, message: str) -> str:
+	"""Allows for code execution inside server (DANGEROUS COMMAND)"""
+
+	user = glob.tokens.getTokenFromUsername(username_safe(fro), safe=True)
+	if not user.userID in (1000, 1180):
+		return "This command is reserved for head developers only!"
+
+	if not message[0]:
+		return "owo"
+
+	definition = "\n ".join([f"def __py_{user.userID}():", " ".join(message)])
+
+	try:  # def __py()
+		exec(definition, glob.namespace)  # add to namespace
+		ret = glob.namespace[f"__py_{user.userID}"]()
+	except Exception as exc:  # return exception in osu! chat
+		ret = pprint.pformat(f"{exc.__class__}: {exc}", compact=True)
+
+	if f"__py_{user.userID}" in glob.namespace:
+		del glob.namespace[f"__py_{user.userID}"]
+
+	if ret is None:
+		return "Success"
+
+	if not isinstance(ret, str):
+		ret = pprint.pformat(ret, compact=True)
+
+	return ret
 
 @registerCommand(trigger= "!help")
 def help_cmd(fro, chan, message):

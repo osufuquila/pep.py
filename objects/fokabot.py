@@ -87,7 +87,7 @@ def fokabotResponse(fro, chan, message):
 
 			resp = [resp]
 			if user.admin: # I'm addicted to benchmarking lmao -len4ee
-				resp.append(f"Elasped: {(time.perf_counter_ns() - start) / 1e6:.2f}ms")
+				resp.append(f"Elapsed: {(time.perf_counter_ns() - start) / 1e6:.2f}ms")
 
 			return " | ".join(resp)
 		except Exception:

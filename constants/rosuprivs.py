@@ -4,7 +4,7 @@
 
 # Hardcoding is the perfect, most maintainable way.
 OWNER = 942669823
-DEVELOPER = 992795
+DEVELOPER = 993051
 DEV_SUPPORTER = 992799 # This is lenforiees fault.
 ADMIN = 940572671
 BAT = 267

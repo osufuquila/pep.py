@@ -6,6 +6,7 @@ import tornado.httpserver
 import tornado.ioloop
 import tornado.web
 import redis
+import sys
 
 from common.db import dbConnector
 from logger import log, DEBUG
@@ -175,6 +176,9 @@ def main():
 			"peppy:change_pass": changePassword.handler(),
 			"peppy:bot_msg": bot_msg_handler.handler()
 		}).start()
+
+		# We will initialise namespace for fancy stuff. UPDATE: FUCK OFF WEIRD PYTHON MODULE.
+		glob.namespace = globals() | {mod: __import__(mod) for mod in sys.modules if mod != "glob"}
 
 		# Start tornado
 		glob.application.listen(glob.config.PORT)
