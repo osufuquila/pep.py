@@ -6,6 +6,10 @@ from collection.matches import MatchList
 from collection.streams import StreamList
 from collection.tokens import TokenList
 from config import conf
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from helpers.status_helper import StatusManager
 
 # Consts.
 DATADOG_PREFIX = "peppy"
@@ -33,3 +37,4 @@ debug = False
 restarting = False
 
 startTime = int(time.time())
+user_statuses: "StatusManager" = None

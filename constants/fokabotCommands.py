@@ -11,6 +11,7 @@ import sys
 import pprint
 import osupyparser
 
+from discord_webhook import DiscordWebhook, DiscordEmbed
 from common import generalUtils
 from common.constants import mods
 from logger import log
@@ -22,10 +23,12 @@ from constants import serverPackets
 from helpers import systemHelper
 from objects import fokabot
 from objects import glob
+from config import conf
 from helpers import chatHelper as chat
 from datetime import datetime
 from datetime import timedelta
 from helpers.user_helper import username_safe
+from helpers.status_helper import UserStatus
 
 REGEX = "^{}( (.+)?)?$"
 commands = {}
@@ -45,8 +48,26 @@ def registerCommand(trigger: str, syntax: str = None, privs: privileges = None):
 		return handler
 	return wrapper
 
+# Change status things...
+def refresh_bmap_cache(md5: str) -> None:
+	"""Tells USSR to drop the beatmap cache for a specific beatmap."""
+
+	glob.redis.publish("ussr:bmap_decache", md5)
+
+def refresh_lb_cache(md5: str, mode: int, c_mode) -> None:
+	"""Refreshes the leaderboard cache for a specific leaderboard."""
+
+	data = f"{md5}:{mode}:{c_mode}"
+	glob.redis.publish("ussr:lb_refresh", data)
+
+def refresh_all_lbs(md5: str) -> None:
+	"""Refreshes ALL of the leaderboards for a given beatmap."""
+
+	for c_mode in (0, 1, 2):
+		for mode in (0, 1, 2, 3): refresh_lb_cache(md5, mode, c_mode)
+
 def calc_completion(bmapid, n300, n100, n50, miss):
-	bmap = osupyparser.OsuFile(f"/home/RealistikOsu/USSR/.data/maps/{bmapid}.osu").parse_file()
+	bmap = osupyparser.OsuFile(f"/home/realistikosu/ussr/.data/maps/{bmapid}.osu").parse_file()
 
 	total_hits = int(n300 + n100 + n50 + miss)
 
@@ -90,25 +111,33 @@ def restartShutdown(restart):
 	systemHelper.scheduleShutdown(5, restart, msg)
 	return msg
 
-def getMatchIDFromChannel(chan):
+def getMatchIDFromChannel(chan: str):
+	"""Gets the id from multiplayer channel."""
+
 	if not chan.lower().startswith("#multi_"):
-		raise exceptions.wrongChannelException()
-	parts = chan.lower().split("_")
-	if len(parts) < 2 or not parts[1].isdigit():
-		raise exceptions.wrongChannelException()
-	matchID = int(parts[1])
-	if matchID not in glob.matches.matches:
-		raise exceptions.matchNotFoundException()
-	return matchID
+		return None
+
+	raw_id = chan.lower().removeprefix("#multi_")
+	if not raw_id.isdigit():
+		return None
+
+	match_id = int(raw_id)
+	if match_id not in glob.matches.matches:
+		return None
+
+	return match_id
 
 def getSpectatorHostUserIDFromChannel(chan):
+	"""Gets user id from spectator channel."""
 	if not chan.lower().startswith("#spect_"):
-		raise exceptions.wrongChannelException()
-	parts = chan.lower().split("_")
-	if len(parts) < 2 or not parts[1].isdigit():
-		raise exceptions.wrongChannelException()
-	userID = int(parts[1])
-	return userID
+		return None
+
+	raw_id = chan.lower().removeprefix("#spect_")
+	if not raw_id.isdigit():
+		return None
+
+	user_id = int(raw_id)
+	return user_id
 
 def getPPMessage(userID, just_data = False):
 	"""Display PP stats for a map."""
@@ -170,6 +199,76 @@ Must have fro, chan and messages as arguments
 return the message or **False** if there's no response by the bot
 TODO: Change False to None, because False doesn't make any sense
 """
+@registerCommand(trigger='!map', privs=privileges.ADMIN_MANAGE_BEATMAPS, syntax='<rank/love/unrank> <set/map>')
+def editMap(fro: str, chan: str, message: list[str]) -> str:
+	"""Edit the ranked status of the last /np'ed map."""
+	# Rank, unrank, and love maps with a single command.
+	# Syntax: /np
+	#         !map <rank/unrank/love> <set/map>
+	message = [m.lower() for m in message]
+
+	if not (token := glob.tokens.getTokenFromUsername(fro)):
+		return
+
+	if not token.tillerino[0]:
+		return "Please give me a beatmap first with /np command."
+
+	if message[0] not in {"rank", "unrank", "love"}:
+		return "Status must be either rank, unrank, or love."
+
+	if message[1] not in {"set", "map"}:
+		return "Scope must either be set or map."
+
+	statuses = {"love": 5, "rank": 2, "unrank": 0}
+	stat_readable = {5: "loved", 2: "ranked", 0: "unranked"}
+
+	status = statuses.get(message[0])
+	status_readable = stat_readable.get(status)
+
+	set_check = message[1] == "set"
+	bmapset_or_bmap = "beatmapset_id" if set_check else "beatmap_id"
+
+	res = glob.db.fetch(
+		"SELECT ranked, beatmapset_id, song_name "
+		"FROM beatmaps WHERE beatmap_id = %s",
+		[token.tillerino[0]]
+	)
+	if not res:
+		return "Could not find beatmap."
+
+	if res["ranked"] == status:
+		return f"That map is already {status_readable}!"
+
+	rank_id = res["beatmapset_id"] if set_check else token.tillerino[0]
+
+	# Update map's ranked status.
+	glob.db.execute(
+		"UPDATE beatmaps SET ranked = %s, ranked_status_freezed = 1, "
+		f"rankedby = %s WHERE {bmapset_or_bmap} = %s",
+		[status, token.userID, rank_id]
+	)
+
+	all_md5 = glob.db.fetchAll("SELECT beatmap_md5 FROM beatmaps WHERE beatmapset_id = %s", [res["beatmapset_id"]])
+	for md5 in all_md5: refresh_all_lbs(md5['beatmap_md5'])
+
+	if set_check: # In theory it should work, practically i have no fucking clue.
+		map_name = res["song_name"].split("[")[0].strip()
+		beatmap_url = f'the beatmap set [https://ussr.pl/beatmaps/{token.tillerino[0]} {map_name}]' 
+	else:
+		map_name = res["song_name"]
+		beatmap_url = f'the beatmap [https://ussr.pl/beatmaps/{token.tillerino[0]} {map_name}]'
+
+	webhook = DiscordWebhook(url=conf.NEW_RANKED_WEBHOOK)
+	embed = DiscordEmbed(description=f"Ranked by {fro}", color=242424)
+	embed.set_author(name=f"{map_name} was just {status_readable}", url=f"https://ussr.pl/beatmaps/{token.tillerino[0]}", icon_url=f"https://a.ussr.pl/{token.userID}")
+	embed.set_footer(text="via RealistikPanel!")
+	embed.set_image(url=f"https://assets.ppy.sh/beatmaps/{res['beatmapset_id']}/covers/cover.jpg")
+	webhook.add_embed(embed)
+	webhook.execute()
+
+	chat.sendMessage(glob.BOT_NAME, '#announce', f'[https://ussr.pl/u/{token.userID} {fro}] has {status_readable} {beatmap_url}')
+	return f'Successfully {status_readable} a map.'
+
 @registerCommand(trigger= "!ir", privs= privileges.ADMIN_MANAGE_SERVERS)
 def instantRestart(fro, chan, message):
 	"""Reloads pep.py instantly."""
@@ -761,13 +860,13 @@ def tillerinoLast(fro, chan, message):
 	map_embed = f"[http://ussr.pl/beatmaps/{data['bid']} {data['sn']}]"
 
 	response = [f"{user_embed} | {map_embed} +{generalUtils.readableMods(data['mods'])}"]
-	fc_or_failquit = (" (Failed/Quit)" if rank == "F" else "") if not data['max_combo'] == data['fc'] else " (FC)"
+	fc_or_failquit = (" (Failed/Quit)" if rank == "F" else " (Choke)") if not int(data['max_combo']) > int(int(data['fc']) * 0.95) and not data['misses_count'] == 0 else " (FC)"
 
 	score_fced = (int(data['max_combo']) > int(int(data['fc']) * 0.95) and data['misses_count'] == 0 and rank != 'F')
 	completion = calc_completion(data["bid"], data["300_count"], data["100_count"], data["50_count"], data["misses_count"])
 
-	completion_or_pp = (f" | {completion:.2f}% map completed" if rank == "F" and data['play_mode'] == 0 else "") if not score_fced else f" | ({oppaiData['pp'][0]:.2f} for {fc_acc:.2f}% FC)" 
-	accuracy_expanded = f"{data['300_count']}x300 // {data['100_count']}x100 // {data['50_count']}x50 // {data['misses_count']}xMiss"
+	completion_or_pp = (f" | {completion:.2f}% map completed" if rank == "F" and data['play_mode'] == 0 else "") if score_fced else f" | ({oppaiData['pp'][-1]:.2f} for {fc_acc:.2f}% FC)" 
+	accuracy_expanded = f"{data['100_count']}x100 // {data['50_count']}x50 // {data['misses_count']}xMiss"
 
 	response.append(f"{{{rank.upper()}, {data['accuracy']:.2f}%}}{fc_or_failquit} {data['max_combo']}/{data['fc']}x | {data['pp']:.2f}pp | {oppaiData['stars']:.2f} ★{completion_or_pp}")
 	response.append(f"{{ {accuracy_expanded} }}")
@@ -1231,71 +1330,87 @@ def postAnnouncement(fro, chan, message): # Post to #announce ingame
 @registerCommand(trigger= "!chimu")
 def chimu(fro, chan, message):
 	"""Gets a download URL for the beatmap from Chimu."""
-	try:
-		matchID = getMatchIDFromChannel(chan)
-	except exceptions.wrongChannelException:
-		matchID = None
-	try:
-		spectatorHostUserID = getSpectatorHostUserIDFromChannel(chan)
-	except exceptions.wrongChannelException:
-		spectatorHostUserID = None
+	user_id = getMatchIDFromChannel(chan)
+	match_id = getSpectatorHostUserIDFromChannel(chan)
 
-	if matchID is not None:
-		if matchID not in glob.matches.matches:
+	if match_id:
+		if match_id not in glob.matches.matches:
 			return "This match doesn't seem to exist... Or does it...?"
-		beatmapID = glob.matches.matches[matchID].beatmapID
-	else:
-		spectatorHostToken = glob.tokens.getTokenFromUserID(spectatorHostUserID, ignoreIRC=True)
-		if spectatorHostToken is None:
+
+		bmap_id = glob.matches.matches[match_id].beatmapID
+	elif user_id:
+		if not glob.tokens.getTokenFromUserID(user_id, ignoreIRC=True):
 			return "The spectator host is offline."
-		beatmapID = spectatorHostToken.beatmapID
-	return chimuMessage(beatmapID)
+
+		bmap_id = spectatorHostToken.beatmapID
+	else:
+		# Check for their tillerinio shit.
+		token = glob.tokens.getTokenFromUsername(username_safe(fro), safe=True)
+		if not token:
+			return False # ??????????????????
+
+		bmap_id = token.tillerino[0]
+		if not bmap_id:
+			return "You're currently not spectating or playing a match, if you wish to request beatmap mirror /np it before!"
+
+	return chimuMessage(bmap_id)
+
 
 @registerCommand(trigger= "!beatconnect")
 def beatconnect(fro, chan, message):
 	"""Gets a download URL for the beatmap from Beatconnect."""
-	try:
-		matchID = getMatchIDFromChannel(chan)
-	except exceptions.wrongChannelException:
-		matchID = None
-	try:
-		spectatorHostUserID = getSpectatorHostUserIDFromChannel(chan)
-	except exceptions.wrongChannelException:
-		spectatorHostUserID = None
+	user_id = getMatchIDFromChannel(chan)
+	match_id = getSpectatorHostUserIDFromChannel(chan)
 
-	if matchID is not None:
-		if matchID not in glob.matches.matches:
+	if match_id:
+		if match_id not in glob.matches.matches:
 			return "This match doesn't seem to exist... Or does it...?"
-		beatmapID = glob.matches.matches[matchID].beatmapID
-	else:
-		spectatorHostToken = glob.tokens.getTokenFromUserID(spectatorHostUserID, ignoreIRC=True)
-		if spectatorHostToken is None:
+
+		bmap_id = glob.matches.matches[match_id].beatmapID
+	elif user_id:
+		if not glob.tokens.getTokenFromUserID(user_id, ignoreIRC=True):
 			return "The spectator host is offline."
-		beatmapID = spectatorHostToken.beatmapID
-	return beatconnectMessage(beatmapID)
+
+		bmap_id = spectatorHostToken.beatmapID
+	else:
+		# Check for their tillerinio shit.
+		token = glob.tokens.getTokenFromUsername(username_safe(fro), safe=True)
+		if not token:
+			return False # ??????????????????
+
+		bmap_id = token.tillerino[0]
+		if not bmap_id:
+			return "You're currently not spectating or playing a match, if you wish to request beatmap mirror /np it before!"
+
+	return beatconnectMessage(bmap_id)
 
 @registerCommand(trigger= "!mirror")
 def mirror(fro, chan, message):
+	"""Gets a download URL for the beatmap from various mirrors."""
+	user_id = getMatchIDFromChannel(chan)
+	match_id = getSpectatorHostUserIDFromChannel(chan)
 
-	try:
-		matchID = getMatchIDFromChannel(chan)
-	except exceptions.wrongChannelException:
-		matchID = None
-	try:
-		spectatorHostUserID = getSpectatorHostUserIDFromChannel(chan)
-	except exceptions.wrongChannelException:
-		spectatorHostUserID = None
-
-	if matchID is not None:
-		if matchID not in glob.matches.matches:
+	if match_id:
+		if match_id not in glob.matches.matches:
 			return "This match doesn't seem to exist... Or does it...?"
-		beatmapID = glob.matches.matches[matchID].beatmapID
-	else:
-		spectatorHostToken = glob.tokens.getTokenFromUserID(spectatorHostUserID, ignoreIRC=True)
-		if spectatorHostToken is None:
+
+		bmap_id = glob.matches.matches[match_id].beatmapID
+	elif user_id:
+		if not glob.tokens.getTokenFromUserID(user_id, ignoreIRC=True):
 			return "The spectator host is offline."
-		beatmapID = spectatorHostToken.beatmapID
-	return mirrorMessage(beatmapID)
+
+		bmap_id = spectatorHostToken.beatmapID
+	else:
+		# Check for their tillerinio shit.
+		token = glob.tokens.getTokenFromUsername(username_safe(fro), safe=True)
+		if not token:
+			return False # ??????????????????
+
+		bmap_id = token.tillerino[0]
+		if not bmap_id:
+			return "You're currently not spectating or playing a match, if you wish to request beatmap mirror /np it before!"
+
+	return mirrorMessage(bmap_id)
 
 @registerCommand(trigger= "!crash", syntax= "<target>", privs= privileges.ADMIN_MANAGE_USERS)
 def crashuser(fro, chan, message):
@@ -1334,6 +1449,39 @@ def bless(fro: str, chan: str, message: str) -> str:
 	t_user.enqueue(q)
 	return "THEY ARE BLESSED AND ASCENDED TO HeAVeN"
 
+ASCII_TROLL = (
+	"░░░░░▄▄▄▄▀▀▀▀▀▀▀▀▄▄▄▄▄▄░░░░░░░\n"
+	"░░░░░█░░░░▒▒▒▒▒▒▒▒▒▒▒▒░░▀▀▄░░░░\n"
+	"░░░░█░░░▒▒▒▒▒▒░░░░░░░░▒▒▒░░█░░░\n"
+	"░░░█░░░░░░▄██▀▄▄░░░░░▄▄▄░░░░█░░\n"
+	"░▄▀▒▄▄▄▒░█▀▀▀▀▄▄█░░░██▄▄█░░░░█░\n"
+	"█░▒█▒▄░▀▄▄▄▀░░░░░░░░█░░░▒▒▒▒▒░█\n"
+	"█░▒█░█▀▄▄░░░░░█▀░░░░▀▄░░▄▀▀▀▄▒█\n"
+	"░█░▀▄░█▄░█▀▄▄░▀░▀▀░▄▄▀░░░░█░░█░\n"
+	"░░█░░░▀▄▀█▄▄░█▀▀▀▄▄▄▄▀▀█▀██░█░░\n"
+	"░░░█░░░░██░░▀█▄▄▄█▄▄█▄████░█░░░\n"
+	"░░░░█░░░░▀▀▄░█░░░█░█▀██████░█░░\n"
+	"░░░░░▀▄░░░░░▀▀▄▄▄█▄█▄█▄█▄▀░░█░░\n"
+	"░░░░░░░▀▄▄░▒▒▒▒░░░░░░░░░░▒░░░█░\n"
+	"░░░░░░░░░░▀▀▄▄░▒▒▒▒▒▒▒▒▒▒░░░░█░\n"
+	"░░░░░░░░░░░░░░▀▄▄▄▄▄░░░░░░░░█░░\n"
+)
+
+@registerCommand(trigger= "!troll", syntax= "<target>", privs= privileges.ADMIN_MANAGE_USERS)
+def troll(fro: str, chan: str, message: str) -> str:
+	"""We do little bit of trolling :tf:"""
+
+	target = username_safe(" ".join(message))
+	t_user = glob.tokens.getTokenFromUsername(target, safe=True)
+	if not t_user: return "This user is not online, and may not be trolled."
+	
+	# Use bytearray for speed
+	q = bytearray()
+	q += serverPackets.sendMessage("Trollface", t_user.username, "We do little bit of trolling :tf:")
+	q += serverPackets.sendMessage("Trollface", t_user.username, ASCII_TROLL)
+	t_user.enqueue(q)
+	return "They have been trolled"
+
 @registerCommand(trigger= "!py", syntax= "<code>", privs= privileges.ADMIN_MANAGE_USERS)
 def py(fro: str, chan: str, message: str) -> str:
 	"""Allows for code execution inside server (DANGEROUS COMMAND)"""
@@ -1364,19 +1512,33 @@ def py(fro: str, chan: str, message: str) -> str:
 
 	return ret
 
+CMD_PER_PAGE = 5
 @registerCommand(trigger= "!help")
 def help_cmd(fro, chan, message):
 	"""Lists all currently available commands!"""
 	user = glob.tokens.getTokenFromUsername(fro)
 
-	help_cmd = []
-	for _, cmd in commands.items():
-		# Basic checks.
-		if cmd.trigger[0] != "!": 
+	# Show them only commands they actually have access to lol.
+	permed_list = []
+	for cmd in commands.values():
+		if (cmd.privileges and not \
+			user.privileges & cmd.privileges) or cmd.trigger[0] != "!":
 			continue
+		permed_list.append(cmd)
 
-		if cmd.privileges and not user.privileges & cmd.privileges:
-			continue
+	# Split the commands into blocks. PS gotta love this long line.
+	cmd_blocks = [permed_list[i:i+CMD_PER_PAGE] for i in range(0, len(permed_list), CMD_PER_PAGE)]
+	pages = len(cmd_blocks)
+
+	index = 1
+	if message and message[0].isdigit():
+		if 1 <= int(message[0]) <= pages:
+			index = int(message[0]) # Cursed.
+		else:
+			return f"Invalid page number (1-{pages})"
+
+	help_cmd = []
+	for idx, cmd in enumerate(cmd_blocks[index-1]): # In theory it should work
 
 		# Make sure callback docstring is not none
 		if not (docstr := cmd.callback.__doc__):
@@ -1385,7 +1547,62 @@ def help_cmd(fro, chan, message):
 		name = cmd.trigger
 		if cmd.syntax: name += f" {cmd.syntax}"
 
-		help_cmd.append(f" - {name} - {docstr}")
+		help_cmd.append(f"{1+idx+(CMD_PER_PAGE*(index-1))}. - {name} - {docstr}")
 
-	header = [f"List of all currently available commands on RealistikOsu! ({len(help_cmd)} total)"]
+	header = [f"--- {index} of {pages} pages of commands currently available on RealistikOsu! ---"]
+	if index == 1:
+		help_cmd.append("You can check syntax of individual command using !syntax <command eg. !help>")
 	return "\n".join(header + help_cmd)
+
+@registerCommand(trigger= "!syntax", syntax="<command>")
+def syntax(fro, chan, message):
+	"""Shows syntax of given command"""
+	if not (token := glob.tokens.getTokenFromUsername(fro)):
+		return False
+
+	# Hardcode it as !help is **only** one command
+	# that takes *optionals* variables.
+	if message[0] == "!help":
+		return "Syntax: !help <Optional: page number>"
+
+	for _, cmd in commands.items():
+		if cmd.trigger == " ".join(message):
+			if cmd.privileges and not cmd.privileges & token.privileges:
+				return False
+			# Return it to them.
+			return f"Syntax: {cmd.trigger} {cmd.syntax or '<No syntax>'}"
+
+	return False
+
+@registerCommand(trigger= "!status", syntax= "<status>")
+def status_cmd(fro: str, chan: str, msg: list[str]) -> str:
+	"""Sets a status for a user."""
+
+	t_user = glob.tokens.getTokenFromUsername(fro)
+	cur_status = glob.user_statuses.get_status(t_user.userID)
+	msg_has_args = msg != [""] # I hate this.
+	# They are toggling it.
+	if (not msg_has_args) and cur_status:
+		cur_status.enabled = not cur_status.enabled
+		cur_status.insert()
+		word = "on" if cur_status.enabled else "off"
+		return f"Your status has been toggled {word}!"
+	elif (not msg_has_args) and not cur_status:
+		return (
+			"You may not toggle your status if you do not have one! "
+			"You may create a new one using the command !status <your status>"
+		)
+	new_status = " ".join(msg)
+
+	if (st_len := len(new_status)) > 256:
+		return f"This status is too long! (Max is 256, yours was {st_len})"
+
+	status = UserStatus(
+		id= None, # Set in insert.
+		user_id= t_user.userID,
+		status= new_status,
+		enabled= True,
+	)
+	status.insert()
+
+	return f"Your status has been set to: {new_status}"

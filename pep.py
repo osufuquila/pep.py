@@ -1,6 +1,7 @@
 import os
 import sys
 from multiprocessing.pool import ThreadPool
+import traceback
 import tornado.gen
 import tornado.httpserver
 import tornado.ioloop
@@ -27,6 +28,7 @@ from objects import banchoConfig
 from objects import fokabot
 from objects import glob
 from pubSubHandlers import changeUsernameHandler, setMainMenuIconHandler
+from helpers.status_helper import StatusManager
 
 from pubSubHandlers import disconnectHandler
 from pubSubHandlers import banHandler
@@ -87,6 +89,7 @@ def main():
 		except Exception:
 			# Exception while connecting to db
 			log.error("Error while connection to database and redis. Please ensure your config and try again.")
+			raise
 
 		# Empty redis cache
 		try:
@@ -151,6 +154,18 @@ def main():
 		log.info("Initializing multiplayer cleanup loop... ")
 		glob.matches.cleanupLoop()
 		log.info("Complete!")
+
+		try:
+			log.info("Loading user statuses...")
+			st_man = StatusManager()
+			loaded = st_man.load_from_db()
+			glob.user_statuses = st_man
+			log.info(f"Loaded {loaded} user statuses!")
+		except Exception:
+			log.error("Loading user statuses failed with error:\n"
+					  + traceback.format_exc())
+			raise
+
 
 		# Debug mode
 		glob.debug = DEBUG

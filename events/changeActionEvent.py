@@ -45,13 +45,13 @@ if userToken.matchID != -1 and userToken.actionID != actions.MULTIPLAYING and us
 	userToken.actionMods = packetData["actionMods"]
 	userToken.beatmapID = packetData["beatmapID"]
 
+
 	if userToken.actionID != 1:
 		if packetData["actionMods"] & 128:
 			# Only reload on mode change.
 			if not userToken.relaxing: userToken.updateCachedStats()
 			userToken.relaxing = True
 			userToken.autopiloting = False
-			userToken.actionText = "[RX] " + packetData["actionText"]
 			userToken.updateCachedStats()
 		#autopiloten
 		elif packetData["actionMods"] & 8192:
@@ -59,15 +59,30 @@ if userToken.matchID != -1 and userToken.actionID != actions.MULTIPLAYING and us
 			if not userToken.autopiloting: userToken.updateCachedStats()
 			userToken.autopiloting = True
 			userToken.relaxing = False
-			userToken.actionText = "[AP] " + packetData["actionText"]
 			userToken.updateCachedStats()
 		else:
 			if (not userToken.autopiloting) and (not userToken.relaxing):
 				userToken.updateCachedStats()
 			userToken.relaxing = False
 			userToken.autopiloting = False
-			userToken.actionText = "[VN] " + packetData["actionText"]
 			userToken.updateCachedStats()
+	
+	prefix = "VN"
+	if userToken.relaxing:
+		prefix = "RX"
+	elif userToken.autopiloting:
+		prefix = "AP"
+	
+	# User Statuses! Apply only on IDLE/AFK
+	if userToken.actionID in (0, 1):
+		# These should not have actionText
+		status = glob.user_statuses.get_status_if_enabled(userID)
+		if status:
+			userToken.actionText = f"({status.status}) [{prefix}]"
+		else:
+			userToken.actionText = f"[{prefix}]"
+	else:
+		userToken.actionText = f"[{prefix}] " + packetData["actionText"]
 	
 	# Enqueue our new user panel and stats to us and our spectators
 	p = (

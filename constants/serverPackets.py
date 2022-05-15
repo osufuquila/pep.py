@@ -69,17 +69,19 @@ def userSupporterGMT(supporter, GMT, tournamentStaff):
 
 def friendList(userID):
 	friends = userUtils.getFriendList(userID)
-	return packetHelper.buildPacket(packetIDs.server_friendsList, ((friends, dataTypes.INT_LIST),))
+	return packetHelper.buildPacket(
+		packetIDs.server_friendsList, (
+			(friends, dataTypes.INT_LIST),
+		)
+	)
 
 def onlineUsers():
-	userIDs = []
+	user_ids = [
+		user.userID for user in glob.tokens.tokens.values()
+		if not user.restricted
+	]
 
-	# Create list with all connected (and not restricted) users
-	for _, value in glob.tokens.tokens.items():
-		if not value.restricted:
-			userIDs.append(value.userID)
-
-	return packetHelper.buildPacket(packetIDs.server_userPresenceBundle, ((userIDs, dataTypes.INT_LIST),))
+	return packetHelper.buildPacket(packetIDs.server_userPresenceBundle, ((user_ids, dataTypes.INT_LIST),))
 
 
 """ Users packets """

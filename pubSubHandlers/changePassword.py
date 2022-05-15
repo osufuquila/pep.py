@@ -2,21 +2,18 @@
 # changed.
 from common.redis import generalPubSubHandler
 from objects import glob
-try:
-	from realistik.user_utils import cached_passwords
-	has_pass = True
-except ImportError: has_pass = False
+from logger import log
 
 class handler(generalPubSubHandler.generalPubSubHandler):
 	def __init__(self):
 		super().__init__()
 		self.structure = {
-			"user_id": 0 # Essentially everything that uses snake case in this pep.py fork is done by me lol
+			"user_id": 0,
 		}
 
 	def handle(self, data):
-		if not has_pass: return
 		data = super().parseData(data)
 		if data is None:
 			return
-		cached_passwords.pop(data["user_id"], None)
+		glob.cached_passwords.pop(data["user_id"], None)
+		log.info(f"Updated password for user ID: {data['user_id']}")

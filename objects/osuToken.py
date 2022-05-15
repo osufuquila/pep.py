@@ -517,11 +517,8 @@ class token:
 		it in the obj."""
 
 		self.privileges = int(glob.db.fetch(
-			"SELECT privileges FROM users WHERE id = %s LIMIT 1"
+			"SELECT privileges FROM users WHERE id = %s LIMIT 1", [self.userID]
 		)["privileges"])
-
-		# Reset some privilege related stuff. These should prob be properties...
-		self.admin = self.privileges in ADMIN_PRIVS
 
 	def checkRestricted(self):
 		"""
