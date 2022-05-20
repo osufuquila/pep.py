@@ -65,7 +65,7 @@ class stream:
 			but = []
 		for token_str in self.clients:
 			token = glob.tokens.tokens.get(token_str)
-			if token:
+			if token and token.token not in but:
 				token.enqueue(data)
 			else:
 				self.removeClient(token= token_str)

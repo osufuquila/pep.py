@@ -485,7 +485,7 @@ class Match:
 				self.slots[i].failed = False
 				self.slots[i].passed = True
 
-	def getUserSlotID(self, userID: int) -> Optional[I]:
+	def getUserSlotID(self, userID: int) -> Optional[int]:
 		"""
 		Get slot ID occupied by userID
 

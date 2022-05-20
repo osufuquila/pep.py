@@ -1,3 +1,4 @@
+import json
 from logger import log
 from common.ripple import userUtils
 from constants import exceptions
@@ -5,6 +6,10 @@ from constants import serverPackets
 from events import logoutEvent
 from objects import fokabot
 from objects import glob
+from typing import TYPE_CHECKING, Optional, Union
+
+if TYPE_CHECKING:
+	from objects.osuToken import UserToken
 
 
 def joinChannel(userID = 0, channel = "", token = None, toIRC = True, force=False):
@@ -142,6 +147,33 @@ def partChannel(userID = 0, channel = "", token = None, toIRC = True, kick = Fal
 		log.warning("User not connected to IRC/Bancho")
 		return 442	# idk
 
+def log_message_db(fro: "UserToken", to_id: Union[int, str], content: str) -> None:
+	"""Logs the message to the database."""
+
+	if isinstance(to_id, str):
+		# Channel Message.
+		glob.db.execute(
+			"INSERT INTO chat_chan_logs (user_id, target_chan, content) VALUES (%s,%s,%s)",
+			(fro.userID, to_id, content),
+		)
+	else:
+		glob.db.execute(
+			"INSERT INTO chat_logs (user_id, target_id, content) VALUES (%s,%s,%s)",
+			(fro.userID, to_id, content),
+		)
+	
+	redis_notify_new_msg(fro.userID, to_id, content)
+	
+
+def redis_notify_new_msg(fro: int, to: Union[int, str], content: str) -> None:
+	"""Notifies the api of a new message."""
+
+	glob.redis.publish("rosu:new_message_notify", json.dumps({
+		"user_id": fro,
+		"target": to,
+		"content": content,
+	}))
+
 def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 	"""
 	Send a message to osu!bancho and IRC server
@@ -202,7 +234,7 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 			raise exceptions.invalidArgumentsException()
 
 		# Truncate message if > 2048 characters
-		message = message[:2048]+"..." if len(message) > 2048 else message
+		message = message[:2045]+"..." if len(message) > 2048 else message
 
 		# Build packet bytes
 		packet = serverPackets.message_notify(token.username, toClient, message)
@@ -234,11 +266,18 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 
 			# Everything seems fine, build recipients list and send packet
 			glob.streams.broadcast("chat/{}".format(to), packet, but=[token.token])
+			# Log the message to db and api.
+			# These channels can overlap and overall are meant to be temporary.
+			if toClient not in ("#multiplayer", "#spectator"):
+				log_message_db(token, to, message)
 		else:
 			# USER
 			# Make sure recipient user is connected
 			recipientToken = glob.tokens.getTokenFromUsername(to)
 			if recipientToken is None:
+				user_id = userUtils.getID(to)
+				if user_id:
+					log_message_db(token, user_id, message)
 				raise exceptions.userNotFoundException()
 
 			# Make sure the recipient is not a tournament client
@@ -257,6 +296,7 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 
 			# Everything seems fine, send packet
 			recipientToken.enqueue(packet)
+			log_message_db(token, recipientToken.userID, message)
 
 		# Spam protection (ignore the bot)
 		if token.userID > 999:

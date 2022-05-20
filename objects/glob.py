@@ -7,6 +7,7 @@ from collection.streams import StreamList
 from collection.tokens import TokenList
 from config import conf
 from typing import TYPE_CHECKING
+from redis import Redis
 
 if TYPE_CHECKING:
     from helpers.status_helper import StatusManager
@@ -19,7 +20,7 @@ __version__ = "3.1.0"
 
 application = None
 db = None
-redis = None
+redis: Redis = None
 config = conf
 banchoConf = None
 namespace = {}
