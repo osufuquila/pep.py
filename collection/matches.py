@@ -2,7 +2,7 @@ import threading
 import time
 
 from constants.exceptions import periodicLoopException
-from objects import match
+from objects.match import Match
 from objects import glob
 from constants import serverPackets
 from logger import log
@@ -10,10 +10,20 @@ from logger import log
 class MatchList:
 	def __init__(self):
 		"""Initialize a matchList object"""
-		self.matches = {}
+		self.matches: dict[int, Match] = {}
 		self.lastID = 1
 
-	def createMatch(self, matchName, matchPassword, beatmapID, beatmapName, beatmapMD5, gameMode, hostUserID, isTourney=False):
+	def createMatch(
+		self,
+		matchName: str,
+		matchPassword: str,
+		beatmapID: int,
+		beatmapName: str,
+		beatmapMD5: str,
+		gameMode: int,
+		hostUserID: int,
+		isTourney=False
+	) -> int:
 		"""
 		Add a new match to matches list
 
@@ -29,10 +39,20 @@ class MatchList:
 		# Add a new match to matches list and create its stream
 		matchID = self.lastID
 		self.lastID+=1
-		self.matches[matchID] = match.match(matchID, matchName, matchPassword, beatmapID, beatmapName, beatmapMD5, gameMode, hostUserID, isTourney)
+		self.matches[matchID] = Match(
+			matchID,
+			matchName,
+			matchPassword,
+			beatmapID,
+			beatmapName,
+			beatmapMD5,
+			gameMode,
+			hostUserID,
+			isTourney
+		)
 		return matchID
 
-	def match_dispose(self, matchID):
+	def match_dispose(self, matchID: int) -> None:
 		"""
 		Destroy match object with id = matchID
 
@@ -52,10 +72,10 @@ class MatchList:
 			_match.userLeft(_token, disposeMatch=False)	# don't dispose the match twice when we remove all players
 
 		# Delete chat channel
-		glob.channels.removeChannel("#multi_{}".format(_match.matchID))
+		glob.channels.removeChannel("#multi_{}".format(matchID))
 
 		# Send matchDisposed packet before disposing streams
-		glob.streams.broadcast(_match.streamName, serverPackets.match_dispose(_match.matchID))
+		glob.streams.broadcast(_match.streamName, serverPackets.match_dispose(matchID))
 
 		# Dispose all streams
 		glob.streams.dispose(_match.streamName)
@@ -66,9 +86,9 @@ class MatchList:
 		# Send match dispose packet to everyone in lobby
 		glob.streams.broadcast("lobby", serverPackets.match_dispose(matchID))
 		del self.matches[matchID]
-		log.info("MPROOM{}: Room disposed manually".format(_match.matchID))
+		log.info("MPROOM{}: Room disposed manually".format(matchID))
 
-	def cleanupLoop(self):
+	def cleanupLoop(self) -> None:
 		"""
 		Start match cleanup loop.
 		Empty matches that have been created more than 60 seconds ago will get deleted.
@@ -84,7 +104,7 @@ class MatchList:
 			exceptions = []
 
 			# Collect all empty matches
-			for key, m in self.matches.items():
+			for m in self.matches.values():
 				if [x for x in m.slots if x.user is not None]:
 					continue
 				if t - m.createTime >= 120:

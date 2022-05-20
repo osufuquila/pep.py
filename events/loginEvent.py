@@ -142,7 +142,7 @@ def handle(tornadoRequest):
 		# Cache this for less db queries
 		user_restricted = (priv & privileges.USER_NORMAL) and not (priv & privileges.USER_PUBLIC)
 
-		if user_restricted: responseToken.setRestricted()
+		if user_restricted: responseToken.notify_restricted()
 		#responseToken.checkRestricted()
 
 		# Check if frozen

@@ -9,14 +9,14 @@ from constants import serverPackets
 from constants.exceptions import periodicLoopException
 from events import logoutEvent
 from objects import glob
-from objects import osuToken
+from objects.osuToken import UserToken
 from typing import Optional
 from helpers.user_helper import username_safe
 
 
 class TokenList:
 	def __init__(self):
-		self.tokens: dict[str, osuToken.token] = {}
+		self.tokens: dict[str, UserToken] = {}
 		self._lock = threading.Lock()
 
 	def __enter__(self):
@@ -25,7 +25,7 @@ class TokenList:
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		self._lock.release()
 
-	def addToken(self, userID, ip = "", irc = False, timeOffset: int=0, tournament: bool=False) -> osuToken.token:
+	def addToken(self, userID, ip = "", irc = False, timeOffset: int=0, tournament: bool=False) -> UserToken:
 		"""
 		Add a token object to tokens list
 
@@ -36,12 +36,12 @@ class TokenList:
 		:param tournament: if True, flag this client as a tournement client. Default: True.
 		:return: token object
 		"""
-		newToken = osuToken.token(userID, ip=ip, irc=irc, timeOffset=timeOffset, tournament=tournament)
+		newToken = UserToken(userID, ip=ip, irc=irc, timeOffset=timeOffset, tournament=tournament)
 		self.tokens[newToken.token] = newToken
 		glob.redis.set("ripple:online_users", len(self.tokens))
 		return newToken
 
-	def deleteToken(self, token: osuToken.token) -> None:
+	def deleteToken(self, token: UserToken) -> None:
 		"""
 		Delete a token from token list if it exists
 
@@ -49,10 +49,9 @@ class TokenList:
 		:return:
 		"""
 		if token in self.tokens:
-			if self.tokens[token].ip != "":
+			if self.tokens[token].ip:
 				userUtils.deleteBanchoSessions(self.tokens[token].userID, self.tokens[token].ip)
 			t = self.tokens.pop(token)
-			del t
 			glob.redis.set("ripple:online_users", len(glob.tokens.tokens))
 
 	def getUserIDFromToken(self, token: str) -> Optional[int]:
@@ -66,7 +65,7 @@ class TokenList:
 		user = self.tokens.get(token)
 		return user.userID if user else None
 
-	def getTokenFromUserID(self, userID: int) -> Optional[osuToken.token]:
+	def getTokenFromUserID(self, userID: int) -> Optional[UserToken]:
 		"""
 		Get token from a user ID
 
@@ -78,7 +77,7 @@ class TokenList:
 			if value.userID == userID:
 				return value
 
-	def getTokenFromUsername(self, username: str, safe: bool = False):
+	def getTokenFromUsername(self, username: str, safe: bool = False) -> Optional[UserToken]:
 		"""
 		Get an osuToken object from an username
 

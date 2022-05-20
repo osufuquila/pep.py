@@ -1,5 +1,12 @@
 from logger import log
 from objects import glob
+from typing import (
+	Optional,
+	TYPE_CHECKING,
+)
+
+if TYPE_CHECKING:
+	from objects.osuToken import UserToken
 
 class stream:
 	def __init__(self, name):
@@ -9,25 +16,28 @@ class stream:
 		:param name: stream name
 		"""
 		self.name = name
-		self.clients = []
+		self.clients: list[str] = []
 
-	def addClient(self, client=None, token=None):
+	def addClient(self, client: Optional["UserToken"] = None, token: Optional[str] = None) -> bool:
 		"""
 		Add a client to this stream if not already in
 
-		:param client: client (osuToken) object
+		:param client: client (UserToken) object
 		:param token: client uuid string
-		:return:
+		:return: Bool of success
 		"""
 		if client is None and token is None:
-			return
+			return False
 		if client is not None:
 			token = client.token
 		if token not in self.clients:
 			log.info("{} has joined stream {}".format(token, self.name))
 			self.clients.append(token)
+			return True
+		
+		return False
 
-	def removeClient(self, client=None, token=None):
+	def removeClient(self, client: Optional["UserToken"] = None, token: Optional[str] = None):
 		"""
 		Remove a client from this stream if in
 
@@ -43,7 +53,7 @@ class stream:
 			log.info("{} has left stream {}".format(token, self.name))
 			self.clients.remove(token)
 
-	def broadcast(self, data, but=None):
+	def broadcast(self, data: bytes, but: Optional[list[str]] = None) -> None:
 		"""
 		Send some data to all (or some) clients connected to this stream
 
@@ -53,19 +63,20 @@ class stream:
 		"""
 		if but is None:
 			but = []
-		for i in self.clients:
-			if i in glob.tokens.tokens:
-				if i not in but:
-					glob.tokens.tokens[i].enqueue(data)
+		for token_str in self.clients:
+			token = glob.tokens.tokens.get(token_str)
+			if token:
+				token.enqueue(data)
 			else:
-				self.removeClient(token=i)
+				self.removeClient(token= token_str)
 
-	def dispose(self):
+	def dispose(self) -> None:
 		"""
 		Tell every client in this stream to leave the stream
 
 		:return:
 		"""
 		for i in self.clients:
-			if i in glob.tokens.tokens:
-				glob.tokens.tokens[i].leaveStream(self.name)
+			token = glob.tokens.tokens.get(i)
+			if token:
+				token.leaveStream(self.name)

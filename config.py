@@ -103,6 +103,6 @@ class Config(ConfigReader):
     REDIS_PASSWORD: str = ""
     GZIP_LEVEL: int     = 6
     THREADS_COUNT: int  = 2
-    NEW_RANKED_WEBHOOK: str = "webhook url"
+    NEW_RANKED_WEBHOOK: str = ""
 
 conf = Config()

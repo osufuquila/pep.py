@@ -1,36 +1,44 @@
-from objects import stream
+from objects.stream import stream
 from objects import glob
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+	from objects.osuToken import UserToken
 
 # TODO: use *args and **kwargs
 class StreamList:
 	def __init__(self):
-		self.streams = {}
+		self.streams: dict[str, stream] = {}
 
-	def add(self, name):
+	def add(self, name: str) -> stream:
 		"""
 		Create a new stream list if it doesn't already exist
 
 		:param name: stream name
-		:return:
+		:return: The stream object.
 		"""
 		if name not in self.streams:
-			self.streams[name] = stream.stream(name)
+			self.streams[name] = stream(name)
 
-	def remove(self, name):
+
+	def remove(self, name: str) -> bool:
 		"""
 		Removes an existing stream and kick every user in it
 
 		:param name: stream name
-		:return:
+		:return: Whether a stream actually got nuked
 		"""
 		if name in self.streams:
 			for i in self.streams[name].clients:
-				if i in glob.tokens.tokens:
-					glob.tokens.tokens[i].leaveStream(name)
+				if t := glob.tokens.tokens.get(i):
+					t.leaveStream(name)
 			self.streams.pop(name)
+			return True
+		
+		return False
 
 
-	def join(self, streamName, client=None, token=None):
+	def join(self, streamName: str, client: Optional["UserToken"] = None, token: Optional[str] = None):
 		"""
 		Add a client to a stream
 
@@ -43,7 +51,7 @@ class StreamList:
 			return
 		self.streams[streamName].addClient(client=client, token=token)
 
-	def leave(self, streamName, client=None, token=None):
+	def leave(self, streamName: str, client: Optional["UserToken"] = None, token: Optional[str] = None):
 		"""
 		Remove a client from a stream
 
@@ -56,7 +64,7 @@ class StreamList:
 			return
 		self.streams[streamName].removeClient(client=client, token=token)
 
-	def broadcast(self, streamName, data, but=None):
+	def broadcast(self, streamName: str, data: bytes, but: Optional[list[str]] = None) -> None:
 		"""
 		Send some data to all clients in a stream
 
@@ -69,7 +77,7 @@ class StreamList:
 			return
 		self.streams[streamName].broadcast(data, but)
 
-	def dispose(self, streamName, *args, **kwargs):
+	def dispose(self, streamName: str) -> None:
 		"""
 		Call `dispose` on `streamName`
 
@@ -80,9 +88,9 @@ class StreamList:
 		"""
 		if streamName not in self.streams:
 			return
-		self.streams[streamName].dispose(*args, **kwargs)
+		self.streams[streamName].dispose()
 
-	def getStream(self, streamName):
+	def getStream(self, streamName: str) -> Optional[stream]:
 		"""
 		Returns streamName's stream object or None if it doesn't exist
 

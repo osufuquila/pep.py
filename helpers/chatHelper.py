@@ -174,7 +174,7 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 			raise exceptions.userRestrictedException()
 
 		# Make sure the user is not silenced
-		if token.isSilenced():
+		if token.silenced:
 			raise exceptions.userSilencedException()
 
 		# Redirect !report to the bot

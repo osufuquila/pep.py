@@ -11,10 +11,12 @@ from constants.rosuprivs import ADMIN_PRIVS
 from events import logoutEvent
 from helpers import chatHelper as chat
 from objects import glob
+from typing import TYPE_CHECKING
 
-MAX_BYTES = 10 * 10 ** 6
+if TYPE_CHECKING:
+	from objects.channel import Channel
 
-class token:
+class UserToken:
 	def __init__(self, userID, token_ = None, ip ="", irc = False, timeOffset = 0, tournament = False):
 		"""
 		Create a token object and set userID and token
@@ -131,8 +133,14 @@ class token:
 		"""Bool corresponding to whether the user is banned from the server."""
 
 		return not self.privileges & privileges.USER_NORMAL
+	
+	@property
+	def silenced(self) -> bool:
+		"""Checks if the user is currently silenced."""
 
-	def enqueue(self, bytes_):
+		return self.silenceEndTime - time.time() > 0
+
+	def enqueue(self, bytes_: bytes) -> None:
 		"""
 		Add bytes (packets) to queue
 
@@ -141,36 +149,27 @@ class token:
 
 		# Stop queuing stuff to the bot so we dont run out of mem
 		if self.userID == 999: return
-		try:
-			# Acquire the buffer lock
-			self._bufferLock.acquire()
 
-			# Avoid memory leaks
-			if len(bytes_) < MAX_BYTES:
-				self.queue += bytes_
-			else:
-				log.warning("{}'s packets buffer is above 10M!! Lost some data!".format(self.username))
-		finally:
-			# Release the buffer lock
-			self._bufferLock.release()
+		with self._bufferLock:
+			self.queue += bytes_
 
-	def resetQueue(self):
+	def resetQueue(self) -> None:
 		"""Resets the queue. Call when enqueued packets have been sent"""
-		try:
-			self._bufferLock.acquire()
-			self.queue = bytearray()
-		finally:
-			self._bufferLock.release()
+
+		with self._bufferLock:
+			self.queue.clear()
 	
 	def fetch_queue(self) -> bytes:
 		"""Manages getting all of the queued packets for the users and clearing
 		the queue, alongside managing the type."""
 
-		b = bytes(self.queue) # Tornado takes bytes, we use bytearray for sped.
-		self.resetQueue()
+		with self._bufferLock:
+			b = bytes(self.queue.copy())
+			self.queue.clear()
+
 		return b
 
-	def joinChannel(self, channelObject):
+	def joinChannel(self, channelObject: "Channel"):
 		"""
 		Join a channel
 
@@ -186,7 +185,7 @@ class token:
 		self.joinStream("chat/{}".format(channelObject.name))
 		self.enqueue(serverPackets.channel_join_success(channelObject.clientName))
 
-	def partChannel(self, channelObject):
+	def partChannel(self, channelObject: "Channel"):
 		"""
 		Remove channel from joined channels list
 
@@ -195,7 +194,7 @@ class token:
 		self.joinedChannels.remove(channelObject.name)
 		self.leaveStream("chat/{}".format(channelObject.name))
 
-	def setLocation(self, latitude, longitude):
+	def setLocation(self, latitude: float, longitude: float) -> None:
 		"""
 		Set client location
 
@@ -204,7 +203,7 @@ class token:
 		"""
 		self.location = (latitude, longitude)
 
-	def getLatitude(self):
+	def getLatitude(self) -> float:
 		"""
 		Get latitude
 
@@ -212,7 +211,7 @@ class token:
 		"""
 		return self.location[0]
 
-	def getLongitude(self):
+	def getLongitude(self) -> float:
 		"""
 		Get longitude
 
@@ -220,16 +219,14 @@ class token:
 		"""
 		return self.location[1]
 
-	def startSpectating(self, host):
+	def startSpectating(self, host: "UserToken") -> None:
 		"""
 		Set the spectating user to userID, join spectator stream and chat channel
 		and send required packets to host
 
-		:param host: host osuToken object
+		:param host: host UserToken object
 		"""
-		try:
-			self._spectLock.acquire()
-
+		with self._spectLock:
 			# Stop spectating old client
 			self.stopSpectating()
 
@@ -266,19 +263,15 @@ class token:
 
 			# Log
 			log.info("{} is spectating {}".format(self.username, host.username))
-		finally:
-			self._spectLock.release()
 
-	def stopSpectating(self):
+	def stopSpectating(self) -> None:
 		"""
 		Stop spectating, leave spectator stream and channel
 		and send required packets to host
 
 		:return:
 		"""
-		try:
-			self._spectLock.acquire()
-
+		with self._spectLock:
 			# Remove our userID from host's spectators
 			if self.spectating is None or self.spectatingUserID <= 0:
 				return
@@ -316,10 +309,8 @@ class token:
 			# Set our spectating user to 0
 			self.spectating = None
 			self.spectatingUserID = 0
-		finally:
-			self._spectLock.release()
 
-	def updatePingTime(self):
+	def updatePingTime(self) -> None:
 		"""
 		Update latest ping time to current time
 
@@ -327,19 +318,17 @@ class token:
 		"""
 		self.pingTime = int(time.time())
 
-	def joinMatch(self, matchID):
+	def joinMatch(self, matchID: int) -> None:
 		"""
 		Set match to matchID, join match stream and channel
 
 		:param matchID: new match ID
 		:return:
 		"""
-		# Make sure the match exists
-		if matchID not in glob.matches.matches:
-			return
-
 		# Match exists, get object
-		match = glob.matches.matches[matchID]
+		match = glob.matches.matches.get(matchID)
+		if not match:
+			return
 
 		# Stop spectating
 		self.stopSpectating()
@@ -367,7 +356,7 @@ class token:
 			# maybe not all users are ready.
 			match.sendReadyStatus()
 
-	def leaveMatch(self):
+	def leaveMatch(self) -> None:
 		"""
 		Leave joined match, match stream and match channel
 
@@ -459,14 +448,6 @@ class token:
 		if self.spamRate > 10:
 			self.silence(1800, "Spamming (auto spam protection)")
 
-	def isSilenced(self):
-		"""
-		Returns True if this user is silenced, otherwise False
-
-		:return: True if this user is silenced, otherwise False
-		"""
-		return self.silenceEndTime-int(time.time()) > 0
-
 	def getSilenceSecondsLeft(self):
 		"""
 		Returns the seconds left for this user's silence
@@ -530,9 +511,9 @@ class token:
 		self.refresh_privs()
 
 		if self.restricted:
-			self.setRestricted()
+			self.notify_restricted()
 		elif not self.restricted and oldRestricted != self.restricted:
-			self.resetRestricted()
+			self.notify_unrestricted()
 
 	def checkBanned(self):
 		"""
@@ -548,7 +529,7 @@ class token:
 			logoutEvent.handle(self, deleteToken=False)
 
 
-	def setRestricted(self):
+	def notify_restricted(self) -> None:
 		"""
 		Set this token as restricted, send FokaBot message to user
 		and send offline packet to everyone
@@ -557,7 +538,7 @@ class token:
 		"""
 		chat.sendMessage(glob.BOT_NAME, self.username, "Your account has been restricted! Please contact the RealistikOsu staff through our Discord server for more info!")
 
-	def resetRestricted(self):
+	def notify_unrestricted(self) -> None:
 		"""
 		Send FokaBot message to alert the user that he has been unrestricted
 		and he has to log in again.
@@ -566,7 +547,7 @@ class token:
 		"""
 		chat.sendMessage(glob.BOT_NAME, self.username, "Your account has been unrestricted! Please re-log to refresh your status.")
 
-	def joinStream(self, name):
+	def joinStream(self, name: str) -> None:
 		"""
 		Join a packet stream, or create it if the stream doesn't exist.
 
@@ -577,7 +558,7 @@ class token:
 		if name not in self.streams:
 			self.streams.append(name)
 
-	def leaveStream(self, name):
+	def leaveStream(self, name: str) -> None:
 		"""
 		Leave a packets stream
 
@@ -588,7 +569,7 @@ class token:
 		if name in self.streams:
 			self.streams.remove(name)
 
-	def leaveAllStreams(self):
+	def leaveAllStreams(self) -> None:
 		"""
 		Leave all joined packet streams
 
@@ -597,7 +578,7 @@ class token:
 		for i in self.streams:
 			self.leaveStream(i)
 
-	def awayCheck(self, userID):
+	def awayCheck(self, userID: int) -> bool:
 		"""
 		Returns True if userID doesn't know that we are away
 		Returns False if we are not away or if userID already knows we are away
@@ -610,7 +591,7 @@ class token:
 		self.sentAway.append(userID)
 		return True
 
-	def addMessageInBuffer(self, chan, message):
+	def addMessageInBuffer(self, chan: str, message: str):
 		"""
 		Add a message in messages buffer (10 messages, truncated at 50 chars).
 		Used as proof when the user gets reported.
@@ -623,7 +604,7 @@ class token:
 			self.messagesBuffer = self.messagesBuffer[1:]
 		self.messagesBuffer.append("{time} - {user}@{channel}: {message}".format(time=time.strftime("%H:%M", time.localtime()), user=self.username, channel=chan, message=message[:50]))
 
-	def getMessagesBufferString(self):
+	def getMessagesBufferString(self) -> str:
 		"""
 		Get the content of the messages buffer as a string
 

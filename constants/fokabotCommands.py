@@ -527,7 +527,7 @@ def restrict(fro, chan, message):
 	# Send restricted mode packet to this user if he's online
 	targetToken = glob.tokens.getTokenFromUsername(username_safe(target), safe=True)
 	if targetToken is not None:
-		targetToken.setRestricted()
+		targetToken.notify_restricted()
 
 	log.rap(userID, f"has put {target} in restricted mode", True)
 	return f"Bye bye {target}. See you later, maybe."
