@@ -29,5 +29,5 @@ def handle(userToken, packetData):
 			# Password is correct, join match
 			userToken.joinMatch(matchID)
 	except exceptions.matchWrongPasswordException:
-		userToken.enqueue(serverPackets.matchJoinFail())
+		userToken.enqueue(serverPackets.match_join_fail())
 		log.warning("{} has tried to join a mp room, but he typed the wrong password".format(userToken.username))

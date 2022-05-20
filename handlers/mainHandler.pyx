@@ -177,7 +177,7 @@ class handler(requestsManager.asyncRequestHandler):
 				responseData = userToken.fetch_queue()
 			except exceptions.tokenNotFoundException:
 				# Token not found. Get the user to be reconnected.
-				responseData = serverPackets.banchoRestart(1)
+				responseData = serverPackets.server_restart(1)
 				responseData += serverPackets.notification("You don't seem to be logged into RealistikOsu anymore... This is common during server restarts, trying to log you back in.")
 				log.warning("Received unknown token! This is normal during server restarts. Reconnecting them.")
 			finally:

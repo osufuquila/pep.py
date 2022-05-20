@@ -17,8 +17,15 @@ import random
 from helpers.user_helper import verify_password
 from helpers.geo_helper import get_full
 
-UNFREEZE_NOTIF = serverPackets.notification("Thank you for providing a liveplay! You have proven your legitemacy and have subsequently been unfrozen. Have fun playing RealistikOsu!")
-FREEZE_RES_NOTIF = serverPackets.notification("Your window for liveplay sumbission has expired! Your account has been restricted as per our cheating policy. Please contact staff for more information on what can be done. This can be done via the RealistikCentral Discord server.")
+UNFREEZE_NOTIF = serverPackets.notification(
+	"Thank you for providing a liveplay! You have proven your legitemacy and "
+	"have subsequently been unfrozen. Have fun playing RealistikOsu!"
+)
+FREEZE_RES_NOTIF = serverPackets.notification(
+	"Your window for liveplay sumbission has expired! Your account has been "
+	"restricted as per our cheating policy. Please contact staff for more "
+	"information on what can be done. This can be done via the RealistikCentral Discord server."
+)
 
 def handle(tornadoRequest):
 	# I wanna benchmark!
@@ -31,10 +38,6 @@ def handle(tornadoRequest):
 
 	# Get IP from tornado request
 	requestIP = tornadoRequest.getRequestIP()
-
-	# Avoid exceptions
-	clientData = ("unknown", "unknown", "unknown", "unknown", "unknown")
-	osuVersion = "unknown"
 
 	# Split POST body so we can get username/password/hardware data
 	# 2:-3 thing is because requestData has some escape stuff that we don't need
@@ -91,9 +94,11 @@ def handle(tornadoRequest):
 		# Make sure we are not banned or locked
 		if (not priv & 3 > 0) and (not priv & privileges.USER_PENDING_VERIFICATION):
 			log.error(f"Login failed for user {username} (user is banned)!")
+			responseData += serverPackets.notification("RealistikOsu: You have been banned!")
 			raise exceptions.loginBannedException()
 
 		# No login errors!
+		log.info(f"DB stuff and password verification done at {t.end_time_str()}")
 
 		# Verify this user (if pending activation)
 		firstLogin = False
@@ -111,7 +116,7 @@ def handle(tornadoRequest):
 
 
 		# Save HWID in db for multiaccount detection
-		hwAllowed = userUtils.logHardware(userID, clientData, firstLogin)
+		hwAllowed = userUtils.logHardware(userID, clientData, firstLogin) # THIS IS SO SLOW
 
 		# This is false only if HWID is empty
 		# if HWID is banned, we get restricted so there's no
@@ -124,6 +129,7 @@ def handle(tornadoRequest):
 
 		# Log user osuver
 		glob.db.execute("UPDATE users SET osuver = %s WHERE id = %s LIMIT 1", [osuVersion, userID])
+		log.info(f"Finished hardware and logging IP at {t.end_time_str()}")
 
 		# Delete old tokens for that user and generate a new one
 		isTournament = "tourney" in osuVersion
@@ -187,6 +193,8 @@ def handle(tornadoRequest):
 			else:
 				# We are mod/admin, send warning notification and continue
 				responseToken.enqueue(serverPackets.notification("Bancho is in maintenance mode. Only mods/admins have full access to the server.\nType !system maintenance off in chat to turn off maintenance mode."))
+		
+		log.info(f"Donor, silence and maintenence checks at {t.end_time_str()}")
 
 		# BAN CUSTOM CHEAT CLIENTS
 		# 0Ainu = First Ainu build
@@ -200,7 +208,7 @@ def handle(tornadoRequest):
 		if tornadoRequest.request.headers.get("ainu"):
 			log.info(f"Account {userID} tried to use Ainu Client 2020!")
 			if user_restricted:
-				responseToken.enqueue(serverPackets.notification("Note: AINU CLIENT IS DETECTED EVERYWHERE... ITS CREATORS LITERALLY ADDED A WAY TO EASILY DETECT."))
+				responseToken.enqueue(serverPackets.notification("Nice try BUDDY."))
 			else:
 				glob.tokens.deleteToken(userID)
 				userUtils.restrict(userID)
@@ -210,7 +218,7 @@ def handle(tornadoRequest):
 		elif osuVersion in ("0Ainu", "b20190326.2", "b20190401.22f56c084ba339eefd9c7ca4335e246f80", "b20191223.3"):
 			log.info(f"Account {userID} tried to use Ainu Client!")
 			if user_restricted:
-				responseToken.enqueue(serverPackets.notification("Note: AINU CLIENT IS DETECTED EVERYWHERE..."))
+				responseToken.enqueue(serverPackets.notification("Nice try BUDDY."))
 			else:
 				glob.tokens.deleteToken(userID)
 				userUtils.restrict(userID)
@@ -250,16 +258,19 @@ def handle(tornadoRequest):
 		elif osuVersion[0] != "b":
 			glob.tokens.deleteToken(userID)
 			raise exceptions.haxException()
+		
+		log.info(f"Anticheat checks at {t.end_time_str()}")
 
 		# Send all needed login packets
 		responseToken.enqueue(
-			bytearray(serverPackets.silenceEndTime(silenceSeconds)) + # Fast addition
-			serverPackets.userID(userID) +
-			serverPackets.protocolVersion() +
-			serverPackets.userSupporterGMT(userSupporter, userGMT, userTournament) +
-			serverPackets.userPanel(userID, True) +
-			serverPackets.userStats(userID, True) +
-			serverPackets.channelInfoEnd()
+			bytearray(serverPackets.silence_end_notify(silenceSeconds)) + # Fast addition
+			serverPackets.login_reply(userID) +
+			serverPackets.protocol_version() +
+			serverPackets.bancho_priv(userSupporter, userGMT, userTournament) +
+			serverPackets.user_presence(userID, True) +
+			serverPackets.user_stats(userID) +
+			serverPackets.channel_info_end() +
+			serverPackets.friend_list(userID)
 		)
 
 		# Default opened channels
@@ -274,20 +285,19 @@ def handle(tornadoRequest):
 		# Output channels info
 		for key, value in glob.channels.channels.items():
 			if value.publicRead and not value.hidden:
-				responseToken.enqueue(serverPackets.channelInfo(key))
-
-		# Send friends list
-		responseToken.enqueue(serverPackets.friendList(userID))
+				responseToken.enqueue(serverPackets.channel_info(key))
 
 		# Send main menu icon
 		if glob.banchoConf.config["menuIcon"] != "":
-			responseToken.enqueue(serverPackets.mainMenuIcon(glob.banchoConf.config["menuIcon"]))
+			responseToken.enqueue(serverPackets.menu_icon(glob.banchoConf.config["menuIcon"]))
 
 		# Send online users' panels
 		with glob.tokens:
-			for _, token in glob.tokens.tokens.items():
+			for token in glob.tokens.tokens.values():
 				if not token.restricted:
-					responseToken.enqueue(serverPackets.userPanel(token.userID))
+					responseToken.enqueue(serverPackets.user_presence(token.userID))
+		
+		log.info(f"Server state and chat {t.end_time_str()}")
 
 		# Localise the user based off IP.
 		# Get location and country from IP
@@ -304,19 +314,19 @@ def handle(tornadoRequest):
 
 		# Send to everyone our userpanel if we are not restricted or tournament
 		if not responseToken.restricted:
-			glob.streams.broadcast("main", serverPackets.userPanel(userID))
+			glob.streams.broadcast("main", serverPackets.user_presence(userID))
 		
 		#creating notification
-		t.end()
-		t_str = t.time_str()
+		t_str = t.end_time_str()
 		online_users = len(glob.tokens.tokens)
 		# Wylie has his own quote he gets to enjoy only himself lmfao. UPDATE: Electro gets it too.
 		if userID in (4674, 3277): quote = "I lost an S because I saw her lewd"
 		# Ced also gets his own AS HE DOESNT WANT TO CHECK FAST SPEED.
 		elif userID == 1002: quote = "juSt Do iT"
 		# Me and relesto are getting one as well lmao. UPDATE: Sky and Aochi gets it too lmao.
-		elif userID in (1000, 1180, 3452, 4812): quote = (f"Hello I'm RealistikBot! The server's official bot to assist you, "
-												"if you want to know what I can do just type !help")
+		elif userID in (1000, 1180, 3452, 4812):
+			quote = (f"Hello I'm RealistikBot! The server's official bot to assist you, "
+					  "if you want to know what I can do just type !help")
 		else: quote = random.choice(glob.banchoConf.config['Quotes'])
 		notif = f"""- Online Users: {online_users}\n- {quote}"""
 		if responseToken.admin: notif += f"\n- Elapsed: {t_str}!"
@@ -329,39 +339,39 @@ def handle(tornadoRequest):
 	except exceptions.loginFailedException:
 		# Login failed error packet
 		# (we don't use enqueue because we don't have a token since login has failed)
-		responseData += serverPackets.loginFailed()
+		responseData += serverPackets.login_failed()
 	except exceptions.invalidArgumentsException:
 		# Invalid POST data
 		# (we don't use enqueue because we don't have a token since login has failed)
-		responseData += serverPackets.loginFailed()
+		responseData += serverPackets.login_failed()
 		responseData += serverPackets.notification("I have eyes y'know?")
 	except exceptions.loginBannedException:
 		# Login banned error packet
-		responseData += serverPackets.loginBanned()
+		responseData += serverPackets.login_banned()
 	except exceptions.loginLockedException:
 		# Login banned error packet
-		responseData += serverPackets.loginLocked()
+		responseData += serverPackets.login_locked()
 	except exceptions.loginCheatClientsException:
 		# Banned for logging in with cheats
-		responseData += serverPackets.loginCheats()
+		responseData += serverPackets.login_cheats()
 	except exceptions.banchoMaintenanceException:
 		# Bancho is in maintenance mode
 		responseData = bytes()
 		if responseToken is not None:
 			responseData = responseToken.fetch_queue()
 		responseData += serverPackets.notification("Our bancho server is in maintenance mode. Please try to login again later.")
-		responseData += serverPackets.loginFailed()
+		responseData += serverPackets.login_failed()
 	except exceptions.banchoRestartingException:
 		# Bancho is restarting
 		responseData += serverPackets.notification("Bancho is restarting. Try again in a few minutes.")
-		responseData += serverPackets.loginFailed()
+		responseData += serverPackets.login_failed()
 	except exceptions.need2FAException:
 		# User tried to log in from unknown IP
-		responseData += serverPackets.needVerification()
+		responseData += serverPackets.verification_required()
 	except exceptions.haxException:
 		# Using oldoldold client, we don't have client data. Force update.
 		# (we don't use enqueue because we don't have a token since login has failed)
-		responseData += serverPackets.forceUpdate()
+		responseData += serverPackets.force_update()
 		responseData += serverPackets.notification("What...")
 	except:
 		log.error("Unknown error!\n```\n{}\n{}```".format(sys.exc_info(), traceback.format_exc()))

@@ -32,7 +32,7 @@ class MatchList:
 		self.matches[matchID] = match.match(matchID, matchName, matchPassword, beatmapID, beatmapName, beatmapMD5, gameMode, hostUserID, isTourney)
 		return matchID
 
-	def disposeMatch(self, matchID):
+	def match_dispose(self, matchID):
 		"""
 		Destroy match object with id = matchID
 
@@ -55,7 +55,7 @@ class MatchList:
 		glob.channels.removeChannel("#multi_{}".format(_match.matchID))
 
 		# Send matchDisposed packet before disposing streams
-		glob.streams.broadcast(_match.streamName, serverPackets.disposeMatch(_match.matchID))
+		glob.streams.broadcast(_match.streamName, serverPackets.match_dispose(_match.matchID))
 
 		# Dispose all streams
 		glob.streams.dispose(_match.streamName)
@@ -64,7 +64,7 @@ class MatchList:
 		glob.streams.remove(_match.playingStreamName)
 
 		# Send match dispose packet to everyone in lobby
-		glob.streams.broadcast("lobby", serverPackets.disposeMatch(matchID))
+		glob.streams.broadcast("lobby", serverPackets.match_dispose(matchID))
 		del self.matches[matchID]
 		log.info("MPROOM{}: Room disposed manually".format(_match.matchID))
 
@@ -94,7 +94,7 @@ class MatchList:
 			# Dispose all empty matches
 			for matchID in emptyMatches:
 				try:
-					self.disposeMatch(matchID)
+					self.match_dispose(matchID)
 				except Exception as e:
 					exceptions.append(e)
 					log.error(

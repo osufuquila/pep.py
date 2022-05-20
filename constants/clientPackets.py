@@ -134,7 +134,7 @@ def transferHost(stream):
 def matchInvite(stream):
 	return packetHelper.readPacketData(stream, [["userID", dataTypes.UINT32]])
 
-def matchFrames(stream):
+def match_frames(stream):
 	return packetHelper.readPacketData(stream,
 	[
 		["time", dataTypes.SINT32],

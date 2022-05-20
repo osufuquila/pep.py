@@ -83,6 +83,10 @@ class Timer:
         """Returns difference in 2dp ms."""
         return round((self.end_time - self.start_time) * 1000, 2)
     
+    def end_time_str(self) -> str:
+        self.end()
+        return self.time_str()
+    
     def time_str(self) -> str:
         """Returns a nicely formatted timing result."""
 

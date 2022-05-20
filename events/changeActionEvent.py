@@ -11,7 +11,7 @@ def handle(userToken, packetData):
 
 	# Make sure we are not banned
 	#if userUtils.isBanned(userID):
-	#	userToken.enqueue(serverPackets.loginBanned())
+	#	userToken.enqueue(serverPackets.login_banned())
 	#	return
 
 	# Send restricted message if needed
@@ -86,8 +86,8 @@ if userToken.matchID != -1 and userToken.actionID != actions.MULTIPLAYING and us
 	
 	# Enqueue our new user panel and stats to us and our spectators
 	p = (
-		serverPackets.userPanel(userID)
-		+ serverPackets.userStats(userID)
+		serverPackets.user_presence(userID)
+		+ serverPackets.user_stats(userID)
 	)
 	userToken.enqueue(p)
 	if userToken.spectators:

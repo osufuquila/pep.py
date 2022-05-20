@@ -76,7 +76,7 @@ class ChannelList:
 		if name not in self.channels:
 			log.debug("{} is not in channels list".format(name))
 			return
-		#glob.streams.broadcast("chat/{}".format(name), serverPackets.channelKicked(name))
+		#glob.streams.broadcast("chat/{}".format(name), serverPackets.channel_kicked(name))
 		stream = glob.streams.getStream("chat/{}".format(name))
 		if stream is not None:
 			for token in stream.clients:

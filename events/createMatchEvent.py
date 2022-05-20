@@ -41,4 +41,4 @@ def handle(userToken, packetData):
 			match.changePassword(packetData["matchPassword"])
 	except exceptions.matchCreateError:
 		log.error("Error while creating match!")
-		userToken.enqueue(serverPackets.matchJoinFail())
+		userToken.enqueue(serverPackets.match_join_fail())

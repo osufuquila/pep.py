@@ -184,7 +184,7 @@ class token:
 			raise exceptions.channelNoPermissionsException()
 		self.joinedChannels.append(channelObject.name)
 		self.joinStream("chat/{}".format(channelObject.name))
-		self.enqueue(serverPackets.channelJoinSuccess(channelObject.clientName))
+		self.enqueue(serverPackets.channel_join_success(channelObject.clientName))
 
 	def partChannel(self, channelObject):
 		"""
@@ -247,7 +247,7 @@ class token:
 			host.joinStream(streamName)
 
 			# Send spectator join packet to host
-			host.enqueue(serverPackets.addSpectator(self.userID))
+			host.enqueue(serverPackets.spectator_add(self.userID))
 
 			# Create and join #spectator (#spect_userid) channel
 			glob.channels.addTempChannel("#spect_{}".format(host.userID))
@@ -257,12 +257,12 @@ class token:
 				chat.joinChannel(token=host, channel="#spect_{}".format(host.userID), force=True)
 
 			# Send fellow spectator join to all clients
-			glob.streams.broadcast(streamName, serverPackets.fellowSpectatorJoined(self.userID))
+			glob.streams.broadcast(streamName, serverPackets.spectator_comrade_joined(self.userID))
 
 			# Get current spectators list
 			for i in host.spectators:
 				if i != self.token and i in glob.tokens.tokens:
-					self.enqueue(serverPackets.fellowSpectatorJoined(glob.tokens.tokens[i].userID))
+					self.enqueue(serverPackets.spectator_comrade_joined(glob.tokens.tokens[i].userID))
 
 			# Log
 			log.info("{} is spectating {}".format(self.username, host.username))
@@ -294,12 +294,12 @@ class token:
 			self.leaveStream(streamName)
 			if hostToken is not None:
 				hostToken.spectators.remove(self.token)
-				hostToken.enqueue(serverPackets.removeSpectator(self.userID))
+				hostToken.enqueue(serverPackets.spectator_remove(self.userID))
 
 				# and to all other spectators
 				for i in hostToken.spectators:
 					if i in glob.tokens.tokens:
-						glob.tokens.tokens[i].enqueue(serverPackets.fellowSpectatorLeft(self.userID))
+						glob.tokens.tokens[i].enqueue(serverPackets.spectator_comrade_left(self.userID))
 
 				# If nobody is spectating the host anymore, close #spectator channel
 				# and remove host from spect stream too
@@ -351,14 +351,14 @@ class token:
 		# Try to join match
 		joined = match.userJoin(self)
 		if not joined:
-			self.enqueue(serverPackets.matchJoinFail())
+			self.enqueue(serverPackets.match_join_fail())
 			return
 
 		# Set matchID, join stream, channel and send packet
 		self.matchID = matchID
 		self.joinStream(match.streamName)
 		chat.joinChannel(token=self, channel="#multi_{}".format(self.matchID), force=True)
-		self.enqueue(serverPackets.matchJoinSuccess(matchID))
+		self.enqueue(serverPackets.match_join_success(matchID))
 
 		if match.isTourney:
 			# Alert the user if we have just joined a tourney match
@@ -414,7 +414,7 @@ class token:
 		log.info("{} has been disconnected. ({})".format(self.username, reason))
 		if message != "":
 			self.enqueue(serverPackets.notification(message))
-		self.enqueue(serverPackets.loginFailed())
+		self.enqueue(serverPackets.login_failed())
 
 		# Logout event
 		logoutEvent.handle(self, deleteToken=self.irc)
@@ -439,10 +439,10 @@ class token:
 		self.silenceEndTime = int(time.time()) + seconds
 
 		# Send silence packet to user
-		self.enqueue(serverPackets.silenceEndTime(seconds))
+		self.enqueue(serverPackets.silence_end_notify(seconds))
 
 		# Send silenced packet to everyone else
-		glob.streams.broadcast("main", serverPackets.userSilenced(self.userID))
+		glob.streams.broadcast("main", serverPackets.silenced_notify(self.userID))
 
 	def spamProtection(self, increaseSpamRate = True):
 		"""
@@ -544,7 +544,7 @@ class token:
 		# Ok so the only place where this is used is right after a priv refresh
 		# from db so...
 		if userUtils.isBanned(self.userID):
-			self.enqueue(serverPackets.loginBanned())
+			self.enqueue(serverPackets.login_banned())
 			logoutEvent.handle(self, deleteToken=False)
 
 

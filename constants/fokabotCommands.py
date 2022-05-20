@@ -483,7 +483,7 @@ def ban(fro, chan, message):
 	# Send ban packet to the user if he's online
 	targetToken = glob.tokens.getTokenFromUsername(username_safe(target), safe=True)
 	if targetToken is not None:
-		targetToken.enqueue(serverPackets.loginBanned())
+		targetToken.enqueue(serverPackets.login_banned())
 
 	log.rap(userID, f"has banned {target}", True)
 	return f"RIP {target}. You will not be missed."
@@ -655,7 +655,7 @@ def systemMaintenance(fro, chan, message):
 					who.append(value.userID)
 
 		glob.streams.broadcast("main", serverPackets.notification("Our realtime server is in maintenance mode. Please try to login again later."))
-		glob.tokens.multipleEnqueue(serverPackets.loginError(), who)
+		glob.tokens.multipleEnqueue(serverPackets.login_error(), who)
 		msg = "The server is now in maintenance mode!"
 	else:
 		# We have turned off maintenance mode
@@ -967,7 +967,7 @@ def multiplayer(fro, chan, message):
 
 	def mpClose():
 		matchID = getMatchIDFromChannel(chan)
-		glob.matches.disposeMatch(matchID)
+		glob.matches.match_dispose(matchID)
 		return "Multiplayer match #{} disposed successfully".format(matchID)
 
 	def mpLock():
@@ -1315,7 +1315,7 @@ def switchServer(fro, chan, message):
 
 	# Connect the user to the end server
 	userToken = glob.tokens.getTokenFromUserID(userID, ignoreIRC=True, _all=False)
-	userToken.enqueue(serverPackets.switchServer(newServer))
+	userToken.enqueue(serverPackets.server_switch(newServer))
 
 	# Disconnect the user from the origin server
 	# userToken.kick()
@@ -1445,7 +1445,7 @@ def bless(fro: str, chan: str, message: str) -> str:
 	# Use bytearray for speed
 	q = bytearray()
 	for b in bible_split:
-		q += serverPackets.sendMessage("Jesus", t_user.username, b)
+		q += serverPackets.message_notify("Jesus", t_user.username, b)
 	t_user.enqueue(q)
 	return "THEY ARE BLESSED AND ASCENDED TO HeAVeN"
 
@@ -1477,8 +1477,8 @@ def troll(fro: str, chan: str, message: str) -> str:
 	
 	# Use bytearray for speed
 	q = bytearray()
-	q += serverPackets.sendMessage("Trollface", t_user.username, "We do little bit of trolling :tf:")
-	q += serverPackets.sendMessage("Trollface", t_user.username, ASCII_TROLL)
+	q += serverPackets.message_notify("Trollface", t_user.username, "We do little bit of trolling :tf:")
+	q += serverPackets.message_notify("Trollface", t_user.username, ASCII_TROLL)
 	t_user.enqueue(q)
 	return "They have been trolled"
 

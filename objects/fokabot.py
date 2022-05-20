@@ -28,8 +28,8 @@ def connect():
 	token.timezone = 24
 	token.country = 2 #this is retared, fuck it im keeping it as europe, couldnt find the uk as its ordered stupidly
 	token.location = (39.01955903386848, 125.75276158057767) # Pyongyang red square
-	glob.streams.broadcast("main", serverPackets.userPanel(999))
-	glob.streams.broadcast("main", serverPackets.userStats(999))
+	glob.streams.broadcast("main", serverPackets.user_presence(999))
+	glob.streams.broadcast("main", serverPackets.user_stats(999))
 
 def reload_commands():
 	"""Reloads the Fokabot commands module."""

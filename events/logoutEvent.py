@@ -32,7 +32,7 @@ def handle(userToken, _=None, deleteToken=True):
 		userToken.leaveAllStreams()
 
 		# Enqueue our disconnection to everyone else
-		glob.streams.broadcast("main", serverPackets.userLogout(userID))
+		glob.streams.broadcast("main", serverPackets.logout_notify(userID))
 
 		# Delete token
 		if deleteToken:

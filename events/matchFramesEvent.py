@@ -17,7 +17,7 @@ def handle(userToken, packetData):
 		return
 
 	# Parse the data
-	data = clientPackets.matchFrames(packetData)
+	data = clientPackets.match_frames(packetData)
 
 	with glob.matches.matches[matchID] as match:
 		# Change slot id in packetData
@@ -28,4 +28,4 @@ def handle(userToken, packetData):
 		match.updateHP(slotID, data["currentHp"])
 
 		# Enqueue frames to who's playing
-		glob.streams.broadcast(match.playingStreamName, serverPackets.matchFrames(slotID, packetData))
+		glob.streams.broadcast(match.playingStreamName, serverPackets.match_frames(slotID, packetData))

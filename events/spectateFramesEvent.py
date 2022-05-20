@@ -8,7 +8,7 @@ def handle(userToken, packetData):
 
 	# Send spectator frames to every spectator
 	streamName = f"spect/{userID}"
-	glob.streams.broadcast(streamName, serverPackets.spectatorFrames(packetData[7:]))
+	glob.streams.broadcast(streamName, serverPackets.spectator_frames(packetData[7:]))
 	log.debug("Broadcasting {}'s frames to {} clients".format(
 		userID,
 		len(glob.streams.streams[streamName].clients))

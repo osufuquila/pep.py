@@ -20,4 +20,4 @@ def handle(userToken, packetData):
 			continue
 
 		# Enqueue stats packets relative to this user
-		userToken.enqueue(serverPackets.userStats(i))
+		userToken.enqueue(serverPackets.user_stats(i))

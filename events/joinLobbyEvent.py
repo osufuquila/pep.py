@@ -12,7 +12,7 @@ def handle(userToken, _):
 
 	# Send matches data
 	for key, _ in glob.matches.matches.items():
-		userToken.enqueue(serverPackets.createMatch(key))
+		userToken.enqueue(serverPackets.match_create(key))
 
 	# Console output
 	log.info("{} has joined multiplayer lobby".format(username))

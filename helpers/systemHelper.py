@@ -49,7 +49,7 @@ def scheduleShutdown(sendRestartTime, restart, message = "", delay=20):
 		glob.streams.broadcast("main", serverPackets.notification(message))
 
 	# Schedule server restart packet
-	threading.Timer(sendRestartTime, glob.streams.broadcast, ["main", serverPackets.banchoRestart(delay*2*1000)]).start()
+	threading.Timer(sendRestartTime, glob.streams.broadcast, ["main", serverPackets.server_restart(delay*2*1000)]).start()
 	glob.restarting = True
 
 	# Restart/shutdown

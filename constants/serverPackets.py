@@ -15,49 +15,46 @@ from constants.rosuprivs import (
 )
 
 """ Login errors packets """
-def loginFailed():
+def login_failed():
 	#return packetHelper.buildPacket(packetIDs.server_userID, ((-1, dataTypes.SINT32)))
 	return b'\x05\x00\x00\x04\x00\x00\x00\xff\xff\xff\xff'
 
-def forceUpdate():
+def force_update():
 	#return packetHelper.buildPacket(packetIDs.server_userID, ((-2, dataTypes.SINT32)))
 	return b'\x05\x00\x00\x04\x00\x00\x00\xfe\xff\xff\xff'
 
-def loginBanned():
+def login_banned():
 	return b'\x05\x00\x00\x04\x00\x00\x00\xff\xff\xff\xff\x18\x00\x00@\x00\x00\x00\x0b>You are banned! Please contact us on Discord (link at ussr.pl)'
 
-def loginLocked():
+def login_locked():
 	return b'\x05\x00\x00\x04\x00\x00\x00\xff\xff\xff\xff\x18\x00\x00A\x00\x00\x00\x0b?Well... Your account is locked but all your data is still safe.'
 
-def loginError():
+def login_error():
 	return b'\x05\x00\x00\x04\x00\x00\x00\xfb\xff\xff\xff'
 
-def loginCheats():
+def login_cheats():
 	return b"\x18\x00\x00L\x00\x00\x00\x0bJWe don't like cheaters here at RealistikOsu! Consider yourself restricted.\x05\x00\x00\x04\x00\x00\x00\xff\xff\xff\xff"
 
-def needSupporter():
-	return b'\x05\x00\x00\x04\x00\x00\x00\xfa\xff\xff\xff'
-
-def needVerification():
+def verification_required():
 	return b'\x05\x00\x00\x04\x00\x00\x00\xf8\xff\xff\xff'
 
 
 """ Login packets """
-def userID(uid):
+def login_reply(uid):
 	return packetHelper.buildPacket(packetIDs.server_userID, ((uid, dataTypes.SINT32),))
 
-def silenceEndTime(seconds):
+def silence_end_notify(seconds):
 	return packetHelper.buildPacket(packetIDs.server_silenceEnd, ((seconds, dataTypes.UINT32),))
 
-def protocolVersion(version = 19):
+def protocol_version(version = 19):
 	# This is always 19 so we might as well
 	#return packetHelper.buildPacket(packetIDs.server_protocolVersion, ((version, dataTypes.UINT32)))
 	return b'K\x00\x00\x04\x00\x00\x00\x13\x00\x00\x00'
 
-def mainMenuIcon(icon):
+def menu_icon(icon):
 	return packetHelper.buildPacket(packetIDs.server_mainMenuIcon, ((icon, dataTypes.STRING),))
 
-def userSupporterGMT(supporter, GMT, tournamentStaff):
+def bancho_priv(supporter, GMT, tournamentStaff):
 	result = 1
 	if supporter:
 		result |= userRanks.SUPPORTER
@@ -67,35 +64,26 @@ def userSupporterGMT(supporter, GMT, tournamentStaff):
 		result |= userRanks.TOURNAMENT_STAFF
 	return packetHelper.buildPacket(packetIDs.server_supporterGMT, ((result, dataTypes.UINT32),))
 
-def friendList(userID):
-	friends = userUtils.getFriendList(userID)
+def friend_list(userID):
+	friends = userUtils.getfriend_list(userID)
 	return packetHelper.buildPacket(
 		packetIDs.server_friendsList, (
 			(friends, dataTypes.INT_LIST),
 		)
 	)
 
-def onlineUsers():
-	user_ids = [
-		user.userID for user in glob.tokens.tokens.values()
-		if not user.restricted
-	]
-
-	return packetHelper.buildPacket(packetIDs.server_userPresenceBundle, ((user_ids, dataTypes.INT_LIST),))
-
-
 """ Users packets """
-def userLogout(userID):
+def logout_notify(userID):
 	return packetHelper.buildPacket(packetIDs.server_userLogout, ((userID, dataTypes.SINT32), (0, dataTypes.BYTE),))
 
-def userPanel(userID, force = False):
+def user_presence(userID, force = False):
 	# Connected and restricted check
 	userToken = glob.tokens.getTokenFromUserID(userID)
 	if userToken is None: return bytes()
 
 	# Get user data
 	username = userToken.username
-	timezone = 24+userToken.timeOffset
+	timezone = 24 + userToken.timeOffset
 	country = userToken.country
 	gameRank = userToken.gameRank 
 	latitude = userToken.getLatitude()
@@ -124,7 +112,7 @@ def userPanel(userID, force = False):
 	))
 
 
-def userStats(userID, force = False):
+def user_stats(userID):
 	# Get userID's token from tokens list
 	userToken = glob.tokens.getTokenFromUserID(userID)
 	if userToken is None: return bytes()
@@ -148,7 +136,7 @@ def userStats(userID, force = False):
 
 
 """ Chat packets """
-def sendMessage(fro, to, message):
+def message_notify(fro: str, to: str, message: str):
 	return packetHelper.buildPacket(packetIDs.server_sendMessage, (
 		(fro, dataTypes.STRING),
 		(message, dataTypes.STRING),
@@ -156,12 +144,12 @@ def sendMessage(fro, to, message):
 		(userUtils.getID(fro), dataTypes.SINT32)
 	))
 
-def channelJoinSuccess(chan):
-	return packetHelper.buildPacket(packetIDs.server_channelJoinSuccess, ((chan, dataTypes.STRING),))
+def channel_join_success(chan: str):
+	return packetHelper.buildPacket(packetIDs.server_channel_join_success, ((chan, dataTypes.STRING),))
 
-def channelInfo(chan):
+def channel_info(chan: str):
 	if chan not in glob.channels.channels:
-		return bytes()
+		return b""
 	channel = glob.channels.channels[chan]
 	return packetHelper.buildPacket(packetIDs.server_channelInfo, (
 		(channel.name, dataTypes.STRING),
@@ -169,38 +157,43 @@ def channelInfo(chan):
 		(len(glob.streams.streams[f"chat/{chan}"].clients), dataTypes.UINT16)
 	))
 
-def channelInfoEnd():
+def channel_info_end():
 	return b'Y\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00'
 
-def channelKicked(chan):
+def channel_kicked(chan):
 	return packetHelper.buildPacket(packetIDs.server_channelKicked, ((chan, dataTypes.STRING),))
 
-def userSilenced(userID):
+def silenced_notify(userID):
 	return packetHelper.buildPacket(packetIDs.server_userSilenced, ((userID, dataTypes.UINT32),))
 
 
 """ Spectator packets """
-def addSpectator(userID):
+def spectator_add(userID):
 	return packetHelper.buildPacket(packetIDs.server_spectatorJoined, ((userID, dataTypes.SINT32),))
 
-def removeSpectator(userID):
+def spectator_remove(userID):
 	return packetHelper.buildPacket(packetIDs.server_spectatorLeft, ((userID, dataTypes.SINT32),))
 
-def spectatorFrames(data):
+def spectator_frames(data):
 	return packetHelper.buildPacket(packetIDs.server_spectateFrames, ((data, dataTypes.BBYTES),))
 
-def noSongSpectator(userID):
+def spectator_song_missing(userID):
 	return packetHelper.buildPacket(packetIDs.server_spectatorCantSpectate, ((userID, dataTypes.SINT32),))
 
-def fellowSpectatorJoined(userID):
-	return packetHelper.buildPacket(packetIDs.server_fellowSpectatorJoined, ((userID, dataTypes.SINT32),))
+def spectator_comrade_joined(user_id: int) -> bytes:
+	return packetHelper.buildPacket(
+		packetIDs.server_fellowSpectatorJoined,
+		(
+			(user_id, dataTypes.SINT32),
+		),
+	)
 
-def fellowSpectatorLeft(userID):
+def spectator_comrade_left(userID):
 	return packetHelper.buildPacket(packetIDs.server_fellowSpectatorLeft, ((userID, dataTypes.SINT32),))
 
 
 """ Multiplayer Packets """
-def createMatch(matchID):
+def match_create(matchID):
 	# Make sure the match exists
 	if matchID not in glob.matches.matches:
 		return bytes()
@@ -211,7 +204,7 @@ def createMatch(matchID):
 	return packetHelper.buildPacket(packetIDs.server_newMatch, matchData)
 
 # TODO: Add match object argument to save some CPU
-def updateMatch(matchID, censored = False):
+def match_update(matchID, censored = False):
 	# Make sure the match exists
 	if matchID not in glob.matches.matches:
 		return bytes()
@@ -220,7 +213,7 @@ def updateMatch(matchID, censored = False):
 	match = glob.matches.matches[matchID]
 	return packetHelper.buildPacket(packetIDs.server_updateMatch, match.getMatchData(censored=censored))
 
-def matchStart(matchID):
+def match_start(matchID: int):
 	# Make sure the match exists
 	if matchID not in glob.matches.matches:
 		return bytes()
@@ -229,10 +222,10 @@ def matchStart(matchID):
 	match = glob.matches.matches[matchID]
 	return packetHelper.buildPacket(packetIDs.server_matchStart, match.getMatchData())
 
-def disposeMatch(matchID):
+def match_dispose(matchID):
 	return packetHelper.buildPacket(packetIDs.server_disposeMatch, ((matchID, dataTypes.UINT32),))
 
-def matchJoinSuccess(matchID):
+def match_join_success(matchID):
 	# Make sure the match exists
 	if matchID not in glob.matches.matches:
 		return bytes()
@@ -242,44 +235,44 @@ def matchJoinSuccess(matchID):
 	data = packetHelper.buildPacket(packetIDs.server_matchJoinSuccess, match.getMatchData())
 	return data
 
-def matchJoinFail():
+def match_join_fail():
 	return b'%\x00\x00\x00\x00\x00\x00'
 
-def changeMatchPassword(newPassword):
+def match_change_password(newPassword):
 	return packetHelper.buildPacket(packetIDs.server_matchChangePassword, ((newPassword, dataTypes.STRING),))
 
-def allPlayersLoaded():
+def match_all_players_loaded():
 	return b'5\x00\x00\x00\x00\x00\x00'
 
-def playerSkipped(userID):
+def match_player_skipped(userID):
 	return packetHelper.buildPacket(packetIDs.server_matchPlayerSkipped, ((userID, dataTypes.SINT32),))
 
-def allPlayersSkipped():
+def match_all_skipped():
 	return b'=\x00\x00\x00\x00\x00\x00'
 
-def matchFrames(slotID, data):
+def match_frames(slotID, data):
 	return packetHelper.buildPacket(packetIDs.server_matchScoreUpdate, ((data[7:11], dataTypes.BBYTES), (slotID, dataTypes.BYTE), (data[12:], dataTypes.BBYTES)))
 
-def matchComplete():
+def match_complete():
 	return b':\x00\x00\x00\x00\x00\x00'
 
-def playerFailed(slotID):
+def match_player_fail(slotID):
 	return packetHelper.buildPacket(packetIDs.server_matchPlayerFailed, ((slotID, dataTypes.UINT32),))
 
-def matchTransferHost():
+def match_new_host_notify():
 	return b'2\x00\x00\x00\x00\x00\x00'
 
-def matchAbort():
+def match_abort():
 	return b'j\x00\x00\x00\x00\x00\x00'
 
-def switchServer(address):
+""" Other packets """
+def server_switch(address):
 	return packetHelper.buildPacket(packetIDs.server_switchServer, ((address, dataTypes.STRING),))
 
-""" Other packets """
 def notification(message):
 	return packetHelper.buildPacket(packetIDs.server_notification, ((message, dataTypes.STRING),))
 
-def banchoRestart(msUntilReconnection):
+def server_restart(msUntilReconnection):
 	return packetHelper.buildPacket(packetIDs.server_restart, ((msUntilReconnection, dataTypes.UINT32),))
 
 def rtx(message):

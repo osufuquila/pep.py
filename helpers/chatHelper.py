@@ -125,7 +125,7 @@ def partChannel(userID = 0, channel = "", token = None, toIRC = True, kick = Fal
 		# Force close tab if needed
 		# NOTE: Maybe always needed, will check later
 		if kick:
-			token.enqueue(serverPackets.channelKicked(channelClient))
+			token.enqueue(serverPackets.channel_kicked(channelClient))
 
 		# Console output
 		log.info("{} parted channel {} ({})".format(token.username, channel, channelClient))
@@ -205,7 +205,7 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 		message = message[:2048]+"..." if len(message) > 2048 else message
 
 		# Build packet bytes
-		packet = serverPackets.sendMessage(token.username, toClient, message)
+		packet = serverPackets.message_notify(token.username, toClient, message)
 
 		# Send the message
 		isChannel = to.startswith("#")
@@ -273,7 +273,7 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 			log.chat("{fro} @ {to}: {message}".format(fro=token.username, to=to, message=message.encode("utf-8").decode("utf-8")))
 		return 0
 	except exceptions.userSilencedException:
-		token.enqueue(serverPackets.silenceEndTime(token.getSilenceSecondsLeft()))
+		token.enqueue(serverPackets.silence_end_notify(token.getSilenceSecondsLeft()))
 		log.warning("{} tried to send a message during silence".format(token.username))
 		return 404
 	except exceptions.channelModeratedException:

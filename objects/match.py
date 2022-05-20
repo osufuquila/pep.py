@@ -155,7 +155,7 @@ class match:
 			return False
 		token = glob.tokens.tokens[self.slots[slotID].user]
 		self.hostUserID = newHost
-		token.enqueue(serverPackets.matchTransferHost())
+		token.enqueue(serverPackets.match_new_host_notify())
 		self.sendUpdates()
 		log.info("MPROOM{}: {} is now the host".format(self.matchID, token.username))
 		return True
@@ -255,7 +255,7 @@ class match:
 
 		# Send updated settings to kicked user, so THEY!!! (WTF RIPPLE??) returns to lobby
 		if self.slots[slotID].user is not None and self.slots[slotID].user in glob.tokens.tokens:
-			glob.tokens.tokens[self.slots[slotID].user].enqueue(serverPackets.updateMatch(self.matchID))
+			glob.tokens.tokens[self.slots[slotID].user].enqueue(serverPackets.match_update(self.matchID))
 
 		# Set new slot status
 		self.setSlot(slotID, status=newStatus, team=0, user=None, mods=0)
@@ -297,7 +297,7 @@ class match:
 
 		:return:
 		"""
-		glob.streams.broadcast(self.playingStreamName, serverPackets.allPlayersLoaded())
+		glob.streams.broadcast(self.playingStreamName, serverPackets.match_all_players_loaded())
 		log.info("MPROOM{}: All players loaded! Match starting...".format(self.matchID))
 
 	def playerSkip(self, userID):
@@ -316,8 +316,8 @@ class match:
 		log.info("MPROOM{}: User {} skipped".format(self.matchID, userID))
 
 		# Send skip packet to every playing user
-		#glob.streams.broadcast(self.playingStreamName, serverPackets.playerSkipped(glob.tokens.tokens[self.slots[slotID].user].userID))
-		glob.streams.broadcast(self.playingStreamName, serverPackets.playerSkipped(slotID))
+		#glob.streams.broadcast(self.playingStreamName, serverPackets.match_player_skipped(glob.tokens.tokens[self.slots[slotID].user].userID))
+		glob.streams.broadcast(self.playingStreamName, serverPackets.match_player_skipped(slotID))
 
 		# Check all skipped
 		total = 0
@@ -337,7 +337,7 @@ class match:
 
 		:return:
 		"""
-		glob.streams.broadcast(self.playingStreamName, serverPackets.allPlayersSkipped())
+		glob.streams.broadcast(self.playingStreamName, serverPackets.match_all_skipped())
 		log.info("MPROOM{}: All players have skipped!".format(self.matchID))
 
 	def updateScore(self, slotID, score):
@@ -426,7 +426,7 @@ class match:
 		self.sendUpdates()
 
 		# Send match complete
-		glob.streams.broadcast(self.streamName, serverPackets.matchComplete())
+		glob.streams.broadcast(self.streamName, serverPackets.match_complete())
 
 		# Destroy playing stream
 		glob.streams.dispose(self.playingStreamName)
@@ -531,7 +531,7 @@ class match:
 		# Check if everyone left
 		if self.countUsers() == 0 and disposeMatch and not self.isTourney:
 			# Dispose match
-			glob.matches.disposeMatch(self.matchID)
+			glob.matches.match_dispose(self.matchID)
 			log.info("MPROOM{}: Room disposed because all users left".format(self.matchID))
 			return
 
@@ -597,7 +597,7 @@ class match:
 		self.matchPassword = newPassword
 
 		# Send password change to every user in match
-		glob.streams.broadcast(self.streamName, serverPackets.changeMatchPassword(self.matchPassword))
+		glob.streams.broadcast(self.streamName, serverPackets.match_change_password(self.matchPassword))
 
 		# Send new match settings too
 		self.sendUpdates()
@@ -668,7 +668,7 @@ class match:
 		self.slots[slotID].passed = False
 
 		# Send packet to everyone
-		glob.streams.broadcast(self.playingStreamName, serverPackets.playerFailed(slotID))
+		glob.streams.broadcast(self.playingStreamName, serverPackets.match_player_fail(slotID))
 
 		# Console output
 		log.info("MPROOM{}: {} has failed!".format(self.matchID, userID))
@@ -739,8 +739,8 @@ class match:
 
 		:return:
 		"""
-		self.matchDataCache = serverPackets.updateMatch(self.matchID)
-		censoredDataCache = serverPackets.updateMatch(self.matchID, censored=True)
+		self.matchDataCache = serverPackets.match_update(self.matchID)
+		censoredDataCache = serverPackets.match_update(self.matchID, censored=True)
 		if self.matchDataCache is not None:
 			glob.streams.broadcast(self.streamName, self.matchDataCache)
 		if censoredDataCache is not None:
@@ -802,7 +802,7 @@ class match:
 				glob.tokens.tokens[self.slots[i].user].joinStream(self.playingStreamName)
 
 		# Send match start packet
-		glob.streams.broadcast(self.playingStreamName, serverPackets.matchStart(self.matchID))
+		glob.streams.broadcast(self.playingStreamName, serverPackets.match_start(self.matchID))
 
 		# Send updates
 		self.sendUpdates()
@@ -824,7 +824,7 @@ class match:
 		self.isStarting = False
 		self.resetSlots()
 		self.sendUpdates()
-		glob.streams.broadcast(self.playingStreamName, serverPackets.matchAbort())
+		glob.streams.broadcast(self.playingStreamName, serverPackets.match_abort())
 		glob.streams.dispose(self.playingStreamName)
 		glob.streams.remove(self.playingStreamName)
 		log.info("MPROOM{}: Match aborted".format(self.matchID))

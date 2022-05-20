@@ -73,8 +73,8 @@ class banchoConfig:
 		glob.channels.loadChannels()
 
 		# Send new channels and new bottom icon to everyone
-		glob.streams.broadcast("main", serverPackets.mainMenuIcon(glob.banchoConf.config["menuIcon"]))
-		glob.streams.broadcast("main", serverPackets.channelInfoEnd())
+		glob.streams.broadcast("main", serverPackets.menu_icon(glob.banchoConf.config["menuIcon"]))
+		glob.streams.broadcast("main", serverPackets.channel_info_end())
 		for key, value in glob.channels.channels.items():
 			if value.publicRead and not value.hidden:
-				glob.streams.broadcast("main", serverPackets.channelInfo(key))
+				glob.streams.broadcast("main", serverPackets.channel_info(key))

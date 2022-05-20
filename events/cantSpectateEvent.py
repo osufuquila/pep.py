@@ -11,7 +11,7 @@ def handle(userToken, _):
 			raise exceptions.tokenNotFoundException()
 
 		# Send the packet to host
-		glob.tokens.tokens[userToken.spectating].enqueue(serverPackets.noSongSpectator(userToken.userID))
+		glob.tokens.tokens[userToken.spectating].enqueue(serverPackets.spectator_song_missing(userToken.userID))
 	except exceptions.tokenNotFoundException:
 		# Stop spectating if token not found
 		log.warning("Spectator can't spectate: token not found")
