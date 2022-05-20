@@ -46,7 +46,7 @@ class MatchList:
 		# Get match and disconnect all players
 		_match = self.matches[matchID]
 		for slot in _match.slots:
-			_token = glob.tokens.getTokenFromUserID(slot.userID, ignoreIRC=True)
+			_token = glob.tokens.getTokenFromUserID(slot.userID)
 			if _token is None:
 				continue
 			_match.userLeft(_token, disposeMatch=False)	# don't dispose the match twice when we remove all players

@@ -258,13 +258,14 @@ def editMap(fro: str, chan: str, message: list[str]) -> str:
 		map_name = res["song_name"]
 		beatmap_url = f'the beatmap [https://ussr.pl/beatmaps/{token.tillerino[0]} {map_name}]'
 
-	webhook = DiscordWebhook(url=conf.NEW_RANKED_WEBHOOK)
-	embed = DiscordEmbed(description=f"Ranked by {fro}", color=242424)
-	embed.set_author(name=f"{map_name} was just {status_readable}", url=f"https://ussr.pl/beatmaps/{token.tillerino[0]}", icon_url=f"https://a.ussr.pl/{token.userID}")
-	embed.set_footer(text="via RealistikPanel!")
-	embed.set_image(url=f"https://assets.ppy.sh/beatmaps/{res['beatmapset_id']}/covers/cover.jpg")
-	webhook.add_embed(embed)
-	webhook.execute()
+	if conf.NEW_RANKED_WEBHOOK:	
+		webhook = DiscordWebhook(url=conf.NEW_RANKED_WEBHOOK)
+		embed = DiscordEmbed(description=f"Ranked by {fro}", color=242424)
+		embed.set_author(name=f"{map_name} was just {status_readable}", url=f"https://ussr.pl/beatmaps/{token.tillerino[0]}", icon_url=f"https://a.ussr.pl/{token.userID}")
+		embed.set_footer(text="via RealistikPanel!")
+		embed.set_image(url=f"https://assets.ppy.sh/beatmaps/{res['beatmapset_id']}/covers/cover.jpg")
+		webhook.add_embed(embed)
+		webhook.execute()
 
 	chat.sendMessage(glob.BOT_NAME, '#announce', f'[https://ussr.pl/u/{token.userID} {fro}] has {status_readable} {beatmap_url}')
 	return f'Successfully {status_readable} a map.'
@@ -593,7 +594,7 @@ def changeUsername(fro, chan, message):
 	if not targetUserID:
 		return f"{target}: User not found"
 
-	tokens = glob.tokens.getTokenFromUserID(targetUserID, True)
+	tokens = glob.tokens.getTokenFromUserID(targetUserID)
 	glob.db.execute("UPDATE `users`  SET `username` = %s, `username_safe` = %s WHERE `id` = %s", (new, newl, targetUserID))
 	glob.db.execute("UPDATE `users_stats` SET `username` = %s WHERE `id` = %s", (new, targetUserID))
 	glob.db.execute("UPDATE `rx_stats` SET `username` = %s WHERE `id` = %s", (new, targetUserID))
@@ -694,7 +695,7 @@ def tillerinoNp(fro, chan, message):
 	# Mirror list trigger for #spect_
 	if chan.startswith("#spect_"):
 		spectatorHostUserID = getSpectatorHostUserIDFromChannel(chan)
-		spectatorHostToken = glob.tokens.getTokenFromUserID(spectatorHostUserID, ignoreIRC=True)
+		spectatorHostToken = glob.tokens.getTokenFromUserID(spectatorHostUserID)
 		if spectatorHostToken is None:
 			return False
 		return mirrorMessage(spectatorHostToken.beatmapID)
@@ -1080,7 +1081,7 @@ def multiplayer(fro, chan, message):
 		userID = userUtils.getIDSafe(username)
 		if userID is None:
 			raise exceptions.userNotFoundException("No such user")
-		token = glob.tokens.getTokenFromUserID(userID, ignoreIRC=True)
+		token = glob.tokens.getTokenFromUserID(userID)
 		if token is None:
 			raise exceptions.invalidUserException("That user is not connected to bancho right now.")
 		_match = glob.matches.matches[getMatchIDFromChannel(chan)]
@@ -1314,7 +1315,7 @@ def switchServer(fro, chan, message):
 		return f"???????"
 
 	# Connect the user to the end server
-	userToken = glob.tokens.getTokenFromUserID(userID, ignoreIRC=True, _all=False)
+	userToken = glob.tokens.getTokenFromUserID(userID)
 	userToken.enqueue(serverPackets.server_switch(newServer))
 
 	# Disconnect the user from the origin server
@@ -1339,10 +1340,11 @@ def chimu(fro, chan, message):
 
 		bmap_id = glob.matches.matches[match_id].beatmapID
 	elif user_id:
-		if not glob.tokens.getTokenFromUserID(user_id, ignoreIRC=True):
+		spec = glob.tokens.getTokenFromUserID(user_id)
+		if not spec:
 			return "The spectator host is offline."
 
-		bmap_id = spectatorHostToken.beatmapID
+		bmap_id = spec.beatmapID
 	else:
 		# Check for their tillerinio shit.
 		token = glob.tokens.getTokenFromUsername(username_safe(fro), safe=True)
@@ -1368,10 +1370,11 @@ def beatconnect(fro, chan, message):
 
 		bmap_id = glob.matches.matches[match_id].beatmapID
 	elif user_id:
-		if not glob.tokens.getTokenFromUserID(user_id, ignoreIRC=True):
+		spec = glob.tokens.getTokenFromUserID(user_id)
+		if not spec:
 			return "The spectator host is offline."
 
-		bmap_id = spectatorHostToken.beatmapID
+		bmap_id = spec.beatmapID
 	else:
 		# Check for their tillerinio shit.
 		token = glob.tokens.getTokenFromUsername(username_safe(fro), safe=True)
@@ -1396,10 +1399,11 @@ def mirror(fro, chan, message):
 
 		bmap_id = glob.matches.matches[match_id].beatmapID
 	elif user_id:
-		if not glob.tokens.getTokenFromUserID(user_id, ignoreIRC=True):
+		spec = glob.tokens.getTokenFromUserID(user_id)
+		if not spec:
 			return "The spectator host is offline."
 
-		bmap_id = spectatorHostToken.beatmapID
+		bmap_id = spec.beatmapID
 	else:
 		# Check for their tillerinio shit.
 		token = glob.tokens.getTokenFromUsername(username_safe(fro), safe=True)

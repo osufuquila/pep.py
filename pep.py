@@ -27,7 +27,6 @@ from helpers import systemHelper as system
 from objects import banchoConfig
 from objects import fokabot
 from objects import glob
-from pubSubHandlers import changeUsernameHandler, setMainMenuIconHandler
 from helpers.status_helper import StatusManager
 
 from pubSubHandlers import disconnectHandler
@@ -38,6 +37,7 @@ from pubSubHandlers import updateStatsHandler
 from pubSubHandlers import refreshPrivsHandler
 from pubSubHandlers import changePassword
 from pubSubHandlers import bot_msg_handler
+from pubSubHandlers import changeUsernameHandler
 
 def make_app():
 	return tornado.web.Application([
@@ -186,7 +186,6 @@ def main():
 			"peppy:silence": updateSilenceHandler.handler(),
 			"peppy:ban": banHandler.handler(),
 			"peppy:notification": notificationHandler.handler(),
-			"peppy:set_main_menu_icon": setMainMenuIconHandler.handler(),
 			"peppy:refresh_privs": refreshPrivsHandler.handler(),
 			"peppy:change_pass": changePassword.handler(),
 			"peppy:bot_msg": bot_msg_handler.handler()
