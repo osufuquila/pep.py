@@ -49,22 +49,10 @@ def registerCommand(trigger: str, syntax: str = None, privs: privileges = None):
 	return wrapper
 
 # Change status things...
-def refresh_bmap_cache(md5: str) -> None:
-	"""Tells USSR to drop the beatmap cache for a specific beatmap."""
+def refresh_bmap(md5: str) -> None:
+	"""Tells USSR to update the beatmap cache for a specific beatmap."""
 
-	glob.redis.publish("ussr:bmap_decache", md5)
-
-def refresh_lb_cache(md5: str, mode: int, c_mode) -> None:
-	"""Refreshes the leaderboard cache for a specific leaderboard."""
-
-	data = f"{md5}:{mode}:{c_mode}"
-	glob.redis.publish("ussr:lb_refresh", data)
-
-def refresh_all_lbs(md5: str) -> None:
-	"""Refreshes ALL of the leaderboards for a given beatmap."""
-
-	for c_mode in (0, 1, 2):
-		for mode in (0, 1, 2, 3): refresh_lb_cache(md5, mode, c_mode)
+	glob.redis.publish("ussr:refresh_bmap", md5)
 
 def calc_completion(bmapid, n300, n100, n50, miss):
 	bmap = osupyparser.OsuFile(f"/home/realistikosu/ussr/.data/maps/{bmapid}.osu").parse_file()
@@ -249,7 +237,7 @@ def editMap(fro: str, chan: str, message: list[str]) -> str:
 	)
 
 	all_md5 = glob.db.fetchAll("SELECT beatmap_md5 FROM beatmaps WHERE beatmapset_id = %s", [res["beatmapset_id"]])
-	for md5 in all_md5: refresh_all_lbs(md5['beatmap_md5'])
+	for md5 in all_md5: refresh_bmap(md5['beatmap_md5'])
 
 	if set_check: # In theory it should work, practically i have no fucking clue.
 		map_name = res["song_name"].split("[")[0].strip()
