@@ -32,3 +32,30 @@ def verify_password(user_id: int, password: str) -> bool:
     # Cache it for later
     if res: glob.cached_passwords[user_id] = password
     return res
+
+def get_country(user_id: int) -> str:
+    """Returns the country of the user.
+    
+    Args:
+        user_id (int): The ID of the user within the database.
+    """
+
+    return glob.db.fetch(
+        "SELECT country FROM users WHERE id = %s LIMIT 1",
+        (user_id,),
+    )["country"]
+
+def set_country(user_id: int, country_code: str) -> None:
+    """Sets the country for a specific user to `country_code`.
+
+    Args:
+        user_id (int): The user ID for the user.
+        country_code (str): The 2 letter country code to set.
+    """
+    
+    country_code = country_code.upper()
+    
+    glob.db.execute(
+        "UPDATE users SET country = %s WHERE id = %s LIMIT 1",
+        (country_code, user_id),
+    )

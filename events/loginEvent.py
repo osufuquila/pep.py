@@ -14,7 +14,7 @@ from datetime import datetime
 from helpers.realistik_stuff import Timer
 from objects import glob
 import random
-from helpers.user_helper import verify_password
+from helpers.user_helper import verify_password, get_country, set_country
 from helpers.geo_helper import get_full
 
 UNFREEZE_NOTIF = serverPackets.notification(
@@ -310,7 +310,7 @@ def handle(tornadoRequest):
 		responseToken.country = country
 
 		# Set country in db if user has no country (first bancho login)
-		if userUtils.getCountry(userID) == "XX": userUtils.setCountry(userID, countryLetters)
+		if get_country(userID) == "XX": userUtils.set_country(userID, countryLetters)
 
 		# Send to everyone our userpanel if we are not restricted or tournament
 		if not responseToken.restricted:

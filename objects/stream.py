@@ -8,7 +8,7 @@ from typing import (
 if TYPE_CHECKING:
 	from objects.osuToken import UserToken
 
-class stream:
+class Stream:
 	def __init__(self, name):
 		"""
 		Initialize a stream object

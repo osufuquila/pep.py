@@ -1,4 +1,4 @@
-from objects.stream import stream
+from objects.stream import Stream
 from objects import glob
 from typing import TYPE_CHECKING, Optional
 
@@ -8,9 +8,9 @@ if TYPE_CHECKING:
 # TODO: use *args and **kwargs
 class StreamList:
 	def __init__(self):
-		self.streams: dict[str, stream] = {}
+		self.streams: dict[str, Stream] = {}
 
-	def add(self, name: str) -> stream:
+	def add(self, name: str) -> Stream:
 		"""
 		Create a new stream list if it doesn't already exist
 
@@ -18,7 +18,7 @@ class StreamList:
 		:return: The stream object.
 		"""
 		if name not in self.streams:
-			self.streams[name] = stream(name)
+			self.streams[name] = Stream(name)
 
 
 	def remove(self, name: str) -> bool:
@@ -90,7 +90,7 @@ class StreamList:
 			return
 		self.streams[streamName].dispose()
 
-	def getStream(self, streamName: str) -> Optional[stream]:
+	def getStream(self, streamName: str) -> Optional[Stream]:
 		"""
 		Returns streamName's stream object or None if it doesn't exist
 

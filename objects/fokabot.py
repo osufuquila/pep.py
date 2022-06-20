@@ -60,7 +60,7 @@ def fokabotResponse(fro, chan, message):
 
 	# This check is neccessary with ripple.
 	if fro == glob.BOT_NAME:
-		return False # FUCK OFF
+		return False
 	
 	user = glob.tokens.getTokenFromUsername(fro)
 	assert len(message) > 0
@@ -73,8 +73,10 @@ def fokabotResponse(fro, chan, message):
 			continue
 
 		args = message.removeprefix(cmd.trigger).strip().split(" ")
-		if cmd.privileges and not \
-			user.privileges & cmd.privileges:
+		if (
+			cmd.privileges and 
+			not user.privileges & cmd.privileges
+		):
 			return False
 
 		if cmd.syntax and not len(args) >= len(cmd.syntax.split(" ")):

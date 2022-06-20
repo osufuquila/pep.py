@@ -299,7 +299,7 @@ def sendMessage(fro = "", to = "", message = "", token = None, toIRC = True):
 			log_message_db(token, recipientToken.userID, message)
 
 		# Spam protection (ignore the bot)
-		if token.userID > 999:
+		if token.userID > 999 or not token.admin:
 			token.spamProtection()
 
 		# Some bot message
