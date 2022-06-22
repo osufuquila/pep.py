@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from geoip2 import database
 
 db_reader = database.Reader("ip_db_2.mmdb")
@@ -252,47 +254,50 @@ countryCodes = {
     "MD": 136,
     "ES": 67,
     "CL": 46,
-    "MH": 138
+    "MH": 138,
 }
 
+
 def getCountryID(code):
-	"""
-	Get osu country ID from country letters
+    """
+    Get osu country ID from country letters
 
-	:param code: country letters (eg: US)
-	:return: country osu code
-	"""
+    :param code: country letters (eg: US)
+    :return: country osu code
+    """
 
-	ccode = countryCodes.get(code)
-	return ccode if ccode is not None else 0
+    ccode = countryCodes.get(code)
+    return ccode if ccode is not None else 0
+
 
 def getCountryLetters(code):
-	"""
-	Get country letters from osu country ID
+    """
+    Get country letters from osu country ID
 
-	:param code: osu country ID
-	:return: country letters (XX if not found)
-	"""
-	for key, value in countryCodes.items():
-		if value == code:
-			return key
+    :param code: osu country ID
+    :return: country letters (XX if not found)
+    """
+    for key, value in countryCodes.items():
+        if value == code:
+            return key
 
-	return "XX"
+    return "XX"
+
 
 def get_full(ip: str) -> tuple:
     """Fetches the user's full geolocation data and returns the imperative
-	info retrieved.
+    info retrieved.
 
-	Note:
-		This uses a really quick IP lookup database. use as a replacement to
-            full on API requests.
-	
-	Args:
-		ip (str): The IP of the user to fetch the info for.
-	
-	Returns:
-		Tuple of data in order of `(lat, long, country)`
-	"""
+    Note:
+            This uses a really quick IP lookup database. use as a replacement to
+        full on API requests.
+
+    Args:
+            ip (str): The IP of the user to fetch the info for.
+
+    Returns:
+            Tuple of data in order of `(lat, long, country)`
+    """
 
     try:
         city = db_reader.city(ip)

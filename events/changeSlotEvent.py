@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 from constants import clientPackets
 from objects import glob
 
+
 def handle(userToken, packetData):
-	# Get usertoken data
-	userID = userToken.userID
+    # Get usertoken data
+    userID = userToken.userID
 
-	# Read packet data
-	packetData = clientPackets.changeSlot(packetData)
+    # Read packet data
+    packetData = clientPackets.changeSlot(packetData)
 
-	with glob.matches.matches[userToken.matchID] as match:
-		# Change slot
-		match.userChangeSlot(userID, packetData["slotID"])
+    with glob.matches.matches[userToken.matchID] as match:
+        # Change slot
+        match.userChangeSlot(userID, packetData["slotID"])
