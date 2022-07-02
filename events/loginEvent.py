@@ -382,7 +382,7 @@ def handle(tornadoRequest):
 
         # Set country in db if user has no country (first bancho login)
         if get_country(userID) == "XX":
-            userUtils.set_country(userID, countryLetters)
+            set_country(userID, countryLetters)
 
         # Send to everyone our userpanel if we are not restricted or tournament
         if not responseToken.restricted:
