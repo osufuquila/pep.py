@@ -18,7 +18,12 @@ if TYPE_CHECKING:
     from objects.osuToken import UserToken
 
 
-def joinChannel(userID=0, channel="", token=None, toIRC=True, force=False):
+def joinChannel(
+    userID: int,
+    channel: str,
+    token: Optional[UserToken]= None,
+    force: bool= False
+):
     """
     Join a channel
 
@@ -36,8 +41,6 @@ def joinChannel(userID=0, channel="", token=None, toIRC=True, force=False):
             # Make sure the token exists
             if token is None:
                 raise exceptions.userNotFoundException
-        else:
-            token = token
 
         # Normal channel, do check stuff
         # Make sure the channel exists
@@ -81,7 +84,13 @@ def joinChannel(userID=0, channel="", token=None, toIRC=True, force=False):
         return 403  # idk
 
 
-def partChannel(userID=0, channel="", token=None, toIRC=True, kick=False, force=False):
+def partChannel(
+    userID: int,
+    channel: str,
+    token: Optional[UserToken]= None,
+    kick: bool= False,
+    force: bool= False
+) -> None:
     """
     Part a channel
 
@@ -104,8 +113,6 @@ def partChannel(userID=0, channel="", token=None, toIRC=True, kick=False, force=
             # Make sure the token exists
             if token is None:
                 raise exceptions.userNotFoundException()
-        else:
-            token = token
 
         # Determine internal/client name if needed
         # (toclient is used clientwise for #multiplayer and #spectator channels)
@@ -161,8 +168,6 @@ def partChannel(userID=0, channel="", token=None, toIRC=True, kick=False, force=
             f"{token.username} parted channel {channel} ({channelClient})",
         )
 
-        # Return IRC code
-        return 0
     except exceptions.channelUnknownException:
         log.warning(
             "{} attempted to part an unknown channel ({})".format(
@@ -170,7 +175,6 @@ def partChannel(userID=0, channel="", token=None, toIRC=True, kick=False, force=
                 channel,
             ),
         )
-        return 403
     except exceptions.userNotInChannelException:
         log.warning(
             "{} attempted to part {}, but he's not in that channel".format(
@@ -178,11 +182,8 @@ def partChannel(userID=0, channel="", token=None, toIRC=True, kick=False, force=
                 channel,
             ),
         )
-        return 442
     except exceptions.userNotFoundException:
         log.warning("User not connected to IRC/Bancho")
-        return 442  # idk
-
 
 def log_message_db(fro: UserToken, to_id: Union[int, str], content: str) -> None:
     """Logs the message to the database."""

@@ -22,14 +22,14 @@ def printServerStartHeader(asciiArt: bool = True):
             bcolours.GREEN,
         )
 
-    print_coloured(f"# PEP.PY - The RealistikOsu! Bancho emulator.", bcolours.BLUE)
+    print_coloured(f"# pep.py - The RealistikOsu Bancho emulator.", bcolours.BLUE)
     print_coloured(
         f"# This is a fork of the now deprecated pep.py by the Ripple Team.",
         bcolours.BLUE,
     )
 
 
-def print_coloured(string: str, color: bcolours):
+def print_coloured(string: str, colour: str):
     """
     Print a colored string
 
@@ -37,4 +37,4 @@ def print_coloured(string: str, color: bcolours):
     :param color: ANSI color code
     :return:
     """
-    print(f"{color}{string}{bcolours.ENDC}")
+    print(colour + string + bcolours.ENDC)
