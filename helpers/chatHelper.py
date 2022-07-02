@@ -19,7 +19,10 @@ if TYPE_CHECKING:
 
 
 def joinChannel(
-    userID: Optional[int] = None, channel: str = "", token: Optional[UserToken] = None, force: bool = False,
+    userID: Optional[int] = None,
+    channel: str = "",
+    token: Optional[UserToken] = None,
+    force: bool = False,
 ):
     """
     Join a channel
