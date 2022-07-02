@@ -1,20 +1,23 @@
+from __future__ import annotations
+
 from objects import glob
 
+
 def handle(userToken, _):
-	# Get userToken data
-	userID = userToken.userID
+    # Get userToken data
+    userID = userToken.userID
 
-	# Get match ID and match object
-	matchID = userToken.matchID
+    # Get match ID and match object
+    matchID = userToken.matchID
 
-	# Make sure we are in a match
-	if matchID == -1:
-		return
+    # Make sure we are in a match
+    if matchID == -1:
+        return
 
-	# Make sure the match exists
-	if matchID not in glob.matches.matches:
-		return
+    # Make sure the match exists
+    if matchID not in glob.matches.matches:
+        return
 
-	# Skip
-	with glob.matches.matches[matchID] as match:
-		match.playerSkip(userID)
+    # Skip
+    with glob.matches.matches[matchID] as match:
+        match.playerSkip(userID)

@@ -1,113 +1,153 @@
+from __future__ import annotations
+
+
 class loginFailedException(Exception):
-	pass
+    pass
+
 
 class loginBannedException(Exception):
-	pass
+    pass
+
 
 class tokenNotFoundException(Exception):
-	pass
+    pass
+
 
 class channelNoPermissionsException(Exception):
-	pass
+    pass
+
 
 class channelUnknownException(Exception):
-	pass
+    pass
+
 
 class channelModeratedException(Exception):
-	pass
+    pass
+
 
 class noAdminException(Exception):
-	pass
+    pass
+
 
 class commandSyntaxException(Exception):
-	pass
+    pass
+
 
 class banchoConfigErrorException(Exception):
-	pass
+    pass
+
 
 class banchoMaintenanceException(Exception):
-	pass
+    pass
+
 
 class moderatedPMException(Exception):
-	pass
+    pass
+
 
 class userNotFoundException(Exception):
-	pass
+    pass
+
 
 class alreadyConnectedException(Exception):
-	pass
+    pass
+
 
 class stopSpectating(Exception):
-	pass
+    pass
+
 
 class matchWrongPasswordException(Exception):
-	pass
+    pass
+
 
 class matchNotFoundException(Exception):
-	pass
+    pass
+
 
 class matchJoinErrorException(Exception):
-	pass
+    pass
+
 
 class matchCreateError(Exception):
-	pass
+    pass
+
 
 class banchoRestartingException(Exception):
-	pass
+    pass
+
 
 class apiException(Exception):
-	pass
+    pass
+
 
 class invalidArgumentsException(Exception):
-	pass
+    pass
+
 
 class messageTooLongWarnException(Exception):
-	pass
+    pass
+
 
 class messageTooLongException(Exception):
-	pass
+    pass
+
 
 class userSilencedException(Exception):
-	pass
+    pass
+
 
 class need2FAException(Exception):
-	pass
+    pass
+
 
 class userRestrictedException(Exception):
-	pass
+    pass
+
 
 class haxException(Exception):
-	pass
+    pass
+
 
 class forceUpdateException(Exception):
-	pass
+    pass
+
 
 class loginCheatClientsException(Exception):
-	pass
+    pass
+
 
 class loginLockedException(Exception):
-	pass
+    pass
+
 
 class unknownStreamException(Exception):
-	pass
+    pass
+
 
 class userTournamentException(Exception):
-	pass
+    pass
+
 
 class userAlreadyInChannelException(Exception):
-	pass
+    pass
+
 
 class userNotInChannelException(Exception):
-	pass
+    pass
+
 
 class missingReportInfoException(Exception):
-	pass
+    pass
+
 
 class invalidUserException(Exception):
-	pass
+    pass
+
 
 class wrongChannelException(Exception):
-	pass
+    pass
+
 
 class periodicLoopException(Exception):
-	pass
+    pass

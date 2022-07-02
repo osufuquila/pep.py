@@ -1,9 +1,14 @@
-from objects import glob
-import tornado.web
-import tornado.gen
-from common.web import requestsManager
+from __future__ import annotations
+
 import json
 import random
+
+import tornado.gen
+import tornado.web
+from common.web import requestsManager
+
+from objects import glob
+
 
 class handler(requestsManager.asyncRequestHandler):
     @tornado.web.asynchronous
@@ -12,10 +17,9 @@ class handler(requestsManager.asyncRequestHandler):
         """Handles the server info endpoint for the Aeris client."""
         resp_dict = {
             "version": 0,
-            "motd": f"RealistikOsu\n" + random.choice(glob.banchoConf.config['Quotes']),
+            "motd": f"RealistikOsu\n" + random.choice(glob.banchoConf.config["Quotes"]),
             "onlineUsers": len(glob.tokens.tokens),
             "icon": "https://ussr.pl/static/image/newlogo2.png",
-            "botID": 999
+            "botID": 999,
         }
         self.write(json.dumps(resp_dict))
-

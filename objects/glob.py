@@ -1,13 +1,16 @@
 """Global objects and variables"""
+from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
+
+from redis import Redis
+
 from collection.channels import ChannelList
 from collection.matches import MatchList
 from collection.streams import StreamList
 from collection.tokens import TokenList
 from config import conf
-from typing import TYPE_CHECKING
-from redis import Redis
 
 if TYPE_CHECKING:
     from helpers.status_helper import StatusManager
@@ -38,4 +41,4 @@ debug = False
 restarting = False
 
 startTime = int(time.time())
-user_statuses: "StatusManager" = None
+user_statuses: StatusManager = None
