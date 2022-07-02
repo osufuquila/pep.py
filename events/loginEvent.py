@@ -462,6 +462,11 @@ def handle(tornadoRequest):
                 traceback.format_exc(),
             ),
         )
+        responseData += serverPackets.login_reply(-5) # Bancho error
+        responseData += serverPackets.notification(
+            "RealistikOsu: The server has experienced an error while logging you "
+            "in! Please notify the developers for help.",
+        )
     finally:
         # Console and discord log
         if len(loginData) < 3:
