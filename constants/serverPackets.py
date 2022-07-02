@@ -90,7 +90,7 @@ def bancho_priv(supporter, GMT, tournamentStaff):
 
 
 def friend_list(userID):
-    friends = userUtils.getfriend_list(userID)
+    friends = userUtils.getFriendList(userID)
     return packetHelper.buildPacket(
         packetIDs.server_friendsList,
         ((friends, dataTypes.INT_LIST),),

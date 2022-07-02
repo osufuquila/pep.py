@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def joinChannel(
-    userID: int, channel: str, token: Optional[UserToken] = None, force: bool = False,
+    userID: Optional[int] = None, channel: str = "", token: Optional[UserToken] = None, force: bool = False,
 ):
     """
     Join a channel
@@ -82,8 +82,8 @@ def joinChannel(
 
 
 def partChannel(
-    userID: int,
-    channel: str,
+    userID: Optional[int] = None,
+    channel: str = "",
     token: Optional[UserToken] = None,
     kick: bool = False,
     force: bool = False,
