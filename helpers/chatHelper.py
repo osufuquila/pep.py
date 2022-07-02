@@ -19,10 +19,7 @@ if TYPE_CHECKING:
 
 
 def joinChannel(
-    userID: int,
-    channel: str,
-    token: Optional[UserToken]= None,
-    force: bool= False
+    userID: int, channel: str, token: Optional[UserToken] = None, force: bool = False,
 ):
     """
     Join a channel
@@ -87,9 +84,9 @@ def joinChannel(
 def partChannel(
     userID: int,
     channel: str,
-    token: Optional[UserToken]= None,
-    kick: bool= False,
-    force: bool= False
+    token: Optional[UserToken] = None,
+    kick: bool = False,
+    force: bool = False,
 ) -> None:
     """
     Part a channel
@@ -184,6 +181,7 @@ def partChannel(
         )
     except exceptions.userNotFoundException:
         log.warning("User not connected to IRC/Bancho")
+
 
 def log_message_db(fro: UserToken, to_id: Union[int, str], content: str) -> None:
     """Logs the message to the database."""
