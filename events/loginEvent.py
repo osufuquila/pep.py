@@ -21,6 +21,8 @@ from helpers.user_helper import verify_password
 from logger import log
 from objects import glob
 
+MINIMUM_CLIENT_YEAR = 2022
+
 UNFREEZE_NOTIF = serverPackets.notification(
     "Thank you for providing a liveplay! You have proven your legitemacy and "
     "have subsequently been unfrozen. Have fun playing RealistikOsu!",
@@ -29,6 +31,14 @@ FREEZE_RES_NOTIF = serverPackets.notification(
     "Your window for liveplay sumbission has expired! Your account has been "
     "restricted as per our cheating policy. Please contact staff for more "
     "information on what can be done. This can be done via the RealistikCentral Discord server.",
+)
+FALLBACK_NOTIF = serverPackets.notification(
+    "Fallback clients are not supported by RealistikOsu. This is due to a combination of missing features "
+    "and server security. Please use a modern build of osu! to play RealistikOsu.",
+)
+OLD_CLIENT_NOTIF = serverPackets.notification(
+    f"You are using an outdated client (minimum release year {MINIMUM_CLIENT_YEAR}). "
+    "Please update your client to the latest version to play RealistikOsu.",
 )
 
 
@@ -327,6 +337,18 @@ def handle(tornadoRequest):
         elif osuVersion[0] != "b":
             glob.tokens.deleteToken(userID)
             raise exceptions.haxException()
+        
+        # Special case for old fallback client
+        elif osuVersion == "20160403.6":
+            glob.tokens.deleteToken(userID)
+            responseData += FALLBACK_NOTIF
+            raise exceptions.loginFailedException
+        
+        # Misc outdated client check
+        elif int(osuVersion[1:5]) < MINIMUM_CLIENT_YEAR:
+            glob.tokens.deleteToken(userID)
+            responseData += OLD_CLIENT_NOTIF
+            raise exceptions.loginFailedException
 
         log.info(f"Anticheat checks at {t.end_time_str()}")
 
@@ -455,7 +477,7 @@ def handle(tornadoRequest):
         # (we don't use enqueue because we don't have a token since login has failed)
         responseData += serverPackets.force_update()
         responseData += serverPackets.notification("What...")
-    except:
+    except Exception:
         log.error(
             "Unknown error!\n```\n{}\n{}```".format(
                 sys.exc_info(),
