@@ -337,13 +337,13 @@ def handle(tornadoRequest):
         elif osuVersion[0] != "b":
             glob.tokens.deleteToken(userID)
             raise exceptions.haxException()
-        
+
         # Special case for old fallback client
         elif osuVersion == "20160403.6":
             glob.tokens.deleteToken(userID)
             responseData += FALLBACK_NOTIF
             raise exceptions.loginFailedException
-        
+
         # Misc outdated client check
         elif int(osuVersion[1:5]) < MINIMUM_CLIENT_YEAR:
             glob.tokens.deleteToken(userID)
