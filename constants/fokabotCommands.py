@@ -33,8 +33,8 @@ from constants import slotStatuses
 from helpers import chatHelper as chat
 from helpers import systemHelper
 from helpers.status_helper import UserStatus
-from helpers.user_helper import username_safe
 from helpers.user_helper import restrict_with_log
+from helpers.user_helper import username_safe
 from logger import log
 from objects import fokabot
 from objects import glob
