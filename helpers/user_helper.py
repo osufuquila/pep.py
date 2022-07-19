@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import bcrypt
 from common.constants import privileges
+from common.ripple.userUtils import removeFromLeaderboard
 
 from objects import glob
 
@@ -125,8 +126,11 @@ def restrict_with_log(
     """
 
     glob.db.execute(
-        f"UPDATE users SET privileges = privileges & ~{privileges.USER_PUBLIC} WHERE id = %s LIMIT 1",
+        f"UPDATE users SET privileges = privileges & ~{privileges.USER_PUBLIC}, "
+        "ban_datetime = UNIX_TIMESTAMP() WHERE id = %s LIMIT 1",
         (user_id,),
     )
+    glob.redis.publish("peppy:ban", user_id)
+    removeFromLeaderboard(user_id)
 
     insert_ban_log(user_id, summary, detail, prefix, from_id)
