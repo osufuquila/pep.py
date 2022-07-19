@@ -462,7 +462,6 @@ def handle(tornadoRequest):
         # Invalid POST data
         # (we don't use enqueue because we don't have a token since login has failed)
         responseData += serverPackets.login_failed()
-        responseData += serverPackets.notification("I have eyes y'know?")
     except exceptions.loginBannedException:
         # Login banned error packet
         responseData += serverPackets.login_banned()

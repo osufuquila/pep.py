@@ -57,6 +57,7 @@ client_channelJoin = 63
 server_channel_join_success = 64
 server_channelInfo = 65
 server_channelKicked = 66
+client_beatmapInfoRequest = 68
 client_matchTransferHost = 70
 server_supporterGMT = 71
 server_friendsList = 72
