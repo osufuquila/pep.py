@@ -15,9 +15,10 @@ from helpers import chatHelper as chat
 from helpers import geo_helper
 from helpers.geo_helper import get_full
 from helpers.realistik_stuff import Timer
-from helpers.user_helper import get_country
+from helpers.user_helper import get_country, restrict_with_log
 from helpers.user_helper import set_country
 from helpers.user_helper import verify_password
+from helpers.user_helper import insert_ban_log
 from logger import log
 from objects import glob
 
@@ -201,7 +202,11 @@ def handle(tornadoRequest):
             )
         elif frozen and passed:
             responseToken.enqueue(FREEZE_RES_NOTIF)
-            userUtils.restrict(responseToken.userID)
+            restrict_with_log(
+                userID,
+                "Time window for liveplay expired",
+                "The time window for the user to submit a liveplay has expired. The user has been automatically restricted.",
+            )
 
         # we thank unfrozen people
         if not frozen and user_db["firstloginafterfrozen"]:
@@ -272,10 +277,12 @@ def handle(tornadoRequest):
                 responseToken.enqueue(serverPackets.notification("Nice try BUDDY."))
             else:
                 glob.tokens.deleteToken(userID)
-                userUtils.restrict(userID)
-                userUtils.appendNotes(
+                restrict_with_log(
                     userID,
-                    "User restricted on login for Ainu Client 2020.",
+                    "Attempted login with Ainu Client 2020",
+                    "The user has attempted to log in with a the Ainu 2020 client. "
+                    "This is a known cheating client. The user has been detected through "
+                    "the ainu header sent on login. (login gate)."
                 )
                 raise exceptions.loginCheatClientsException()
         # Ainu Client 2019
@@ -290,10 +297,12 @@ def handle(tornadoRequest):
                 responseToken.enqueue(serverPackets.notification("Nice try BUDDY."))
             else:
                 glob.tokens.deleteToken(userID)
-                userUtils.restrict(userID)
-                userUtils.appendNotes(
+                restrict_with_log(
                     userID,
-                    "User restricted on login for Ainu Client 2019 (or older).",
+                    "Attempted login with Ainu Client",
+                    "The user has attempted to log in with a client which has a version "
+                    f"matching known Ainu cheating client versions ({osuVersion}). "
+                    "(login gate)",
                 )
                 raise exceptions.loginCheatClientsException()
         # hqOsu
@@ -303,10 +312,12 @@ def handle(tornadoRequest):
                 responseToken.enqueue(serverPackets.notification("Comedian."))
             else:
                 glob.tokens.deleteToken(userID)
-                userUtils.restrict(userID)
-                userUtils.appendNotes(
+                restrict_with_log(
                     userID,
-                    "User restricted on login for HQOsu (normal).",
+                    "Attempted login with hqOsu",
+                    "The user has attempted to log in with a client version matching "
+                    f"the default setting of the hQosu multiaccounting utility ({osuVersion}). "
+                    "(login gate)",
                 )
                 raise exceptions.loginCheatClientsException()
 
@@ -317,10 +328,12 @@ def handle(tornadoRequest):
                 responseToken.enqueue(serverPackets.notification("Comedian."))
             else:
                 glob.tokens.deleteToken(userID)
-                userUtils.restrict(userID)
-                userUtils.appendNotes(
+                restrict_with_log(
                     userID,
-                    "User restricted on login for HQOsu (legacy).",
+                    "Attempted login with hqOsu (legacy)",
+                    "The user has attempted to log in with a client version matching "
+                    f"the default setting of the hQosu multiaccounting utility ({osuVersion}). "
+                    "(login gate)",
                 )
                 raise exceptions.loginCheatClientsException()
         # Budget Hacked client.
@@ -329,8 +342,13 @@ def handle(tornadoRequest):
                 responseToken.enqueue(serverPackets.notification("Comedian."))
             else:
                 glob.tokens.deleteToken(userID)
-                userUtils.restrict(userID)
-                userUtils.appendNotes(userID, "Wack 2016 Scooter client.")
+                restrict_with_log(
+                    userID,
+                    "Attempted login with Skoot client.",
+                    "The user attempted to log in with the Skoot custom client. "
+                    f"This has been detected through the osu! version sent on login ({osuVersion}). "
+                    "(login gate)",
+                )
                 raise exceptions.loginCheatClientsException()
 
         # Blanket cover for most retard clients, force update.
