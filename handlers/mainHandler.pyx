@@ -54,6 +54,7 @@ from events import userStatsRequestEvent
 from events import tournamentMatchInfoRequestEvent
 from events import tournamentJoinMatchChannelEvent
 from events import tournamentLeaveMatchChannelEvent
+from events import beatmapInfoRequest
 from helpers import packetHelper
 from objects import glob
 
@@ -114,6 +115,7 @@ eventHandler = {
 	packetIDs.client_tournamentMatchInfoRequest: (tournamentMatchInfoRequestEvent),
 	packetIDs.client_tournamentJoinMatchChannel: (tournamentJoinMatchChannelEvent),
 	packetIDs.client_tournamentLeaveMatchChannel: (tournamentLeaveMatchChannelEvent),
+	packetIDs.client_beatmapInfoRequest: (beatmapInfoRequest),
 }
 
 
