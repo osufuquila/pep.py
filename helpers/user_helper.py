@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import bcrypt
+from common.constants import privileges
 
 from objects import glob
-from common.constants import privileges
 
 
 def username_safe(s: str) -> str:
@@ -71,12 +71,13 @@ def set_country(user_id: int, country_code: str) -> None:
         (country_code, user_id),
     )
 
+
 def insert_ban_log(
     user_id: int,
     summary: str,
     detail: str,
     prefix: bool = True,
-    from_id: int = 999, # TODO: Don't hardcode the bot id.
+    from_id: int = 999,  # TODO: Don't hardcode the bot id.
 ) -> None:
     """Inserts a ban log for a user into the database.
 
@@ -89,10 +90,10 @@ def insert_ban_log(
         from_id (int, optional): The ID of the user who banned the user.
             Defaults to 999 (the bot).
     """
-    
+
     if prefix:
         detail = "pep.py Autoban: " + detail
-    
+
     glob.db.execute(
         "INSERT INTO ban_logs (from_id, to_id, summary, detail) VALUES (%s, %s, %s, %s)",
         (
@@ -100,8 +101,9 @@ def insert_ban_log(
             user_id,
             summary,
             detail,
-        )
+        ),
     )
+
 
 def restrict_with_log(
     user_id: int,
@@ -121,10 +123,10 @@ def restrict_with_log(
         from_id (int, optional): The ID of the user who banned the user.
             Defaults to 999 (the bot).
     """
-    
+
     glob.db.execute(
         f"UPDATE users SET privileges = privileges & ~{privileges.USER_PUBLIC} WHERE id = %s LIMIT 1",
-        (user_id,)
+        (user_id,),
     )
-    
+
     insert_ban_log(user_id, summary, detail, prefix, from_id)
