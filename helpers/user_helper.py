@@ -3,9 +3,10 @@ from __future__ import annotations
 import bcrypt
 
 from objects import glob
+from common.constants import privileges
 
 
-def username_safe(s: str):
+def username_safe(s: str) -> str:
     """Returns safe to use username."""
 
     return s.lower().strip().replace(" ", "_")
@@ -69,3 +70,61 @@ def set_country(user_id: int, country_code: str) -> None:
         "UPDATE users SET country = %s WHERE id = %s LIMIT 1",
         (country_code, user_id),
     )
+
+def insert_ban_log(
+    user_id: int,
+    summary: str,
+    detail: str,
+    prefix: bool = True,
+    from_id: int = 999, # TODO: Don't hardcode the bot id.
+) -> None:
+    """Inserts a ban log for a user into the database.
+
+    Args:
+        user_id (int): The ID of the user to assign the log to.
+        summary (str): A short description of the reason.
+        detail (str): A more detailed, in-depth description of the reason.
+        prefix (bool, optional): Whether the detail should be prefixed by
+            the peppy signature. Defaults to True.
+        from_id (int, optional): The ID of the user who banned the user.
+            Defaults to 999 (the bot).
+    """
+    
+    if prefix:
+        detail = "pep.py Autoban: " + detail
+    
+    glob.db.execute(
+        "INSERT INTO ban_logs (from_id, to_id, summary, detail) VALUES (%s, %s, %s, %s)",
+        (
+            from_id,
+            user_id,
+            summary,
+            detail,
+        )
+    )
+
+def restrict_with_log(
+    user_id: int,
+    summary: str,
+    detail: str,
+    prefix: bool = True,
+    from_id: int = 999,
+) -> None:
+    """Restricts the user alongside inserting a log into the database.
+
+    Args:
+        user_id (int): The ID of the user to assign the log to.
+        summary (str): A short description of the reason.
+        detail (str): A more detailed, in-depth description of the reason.
+        prefix (bool, optional): Whether the detail should be prefixed by
+            the peppy signature. Defaults to True.
+        from_id (int, optional): The ID of the user who banned the user.
+            Defaults to 999 (the bot).
+    """
+    
+    glob.db.execute(
+        f"UPDATE users SET privileges = privileges & ~{privileges.USER_PUBLIC} WHERE id = %s LIMIT 1",
+        (user_id,)
+    )
+    
+    insert_ban_log(user_id, summary, detail, prefix, from_id)
