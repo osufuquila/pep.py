@@ -15,10 +15,11 @@ from helpers import chatHelper as chat
 from helpers import geo_helper
 from helpers.geo_helper import get_full
 from helpers.realistik_stuff import Timer
-from helpers.user_helper import get_country, restrict_with_log
+from helpers.user_helper import get_country
+from helpers.user_helper import insert_ban_log
+from helpers.user_helper import restrict_with_log
 from helpers.user_helper import set_country
 from helpers.user_helper import verify_password
-from helpers.user_helper import insert_ban_log
 from logger import log
 from objects import glob
 
@@ -282,7 +283,7 @@ def handle(tornadoRequest):
                     "Attempted login with Ainu Client 2020",
                     "The user has attempted to log in with a the Ainu 2020 client. "
                     "This is a known cheating client. The user has been detected through "
-                    "the ainu header sent on login. (login gate)."
+                    "the ainu header sent on login. (login gate).",
                 )
                 raise exceptions.loginCheatClientsException()
         # Ainu Client 2019
