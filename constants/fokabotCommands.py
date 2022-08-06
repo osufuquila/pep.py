@@ -11,6 +11,7 @@ from collections import namedtuple
 from datetime import datetime
 from datetime import timedelta
 from typing import Callable
+from typing import Optional
 
 import osupyparser
 import requests
@@ -46,7 +47,7 @@ commands = {}
 Command = namedtuple("Command", ["trigger", "callback", "syntax", "privileges"])
 
 
-def registerCommand(trigger: str, syntax: str = None, privs: privileges = None):
+def registerCommand(trigger: str, syntax: Optional[str] = None, privs: Optional[int] = None):
     """A decorator to set commands into list."""
     global commands
 
@@ -125,7 +126,7 @@ def mirrorMessage(beatmapID):
     )
 
 
-def restartShutdown(restart):
+def restartShutdown(restart: bool):
     """Restart (if restart = True) or shutdown (if restart = False) pep.py safely"""
     msg = "We are performing some maintenance. Bancho will {} in 5 seconds. Thank you for your patience.".format(
         "restart" if restart else "shutdown",
@@ -308,7 +309,7 @@ def editMap(fro: str, chan: str, message: list[str]) -> str:
             url=f"https://ussr.pl/beatmaps/{token.tillerino[0]}",
             icon_url=f"https://a.ussr.pl/{token.userID}",
         )
-        embed.set_footer(text="via RealistikPanel!")
+        embed.set_footer(text="via pep.py!")
         embed.set_image(
             url=f"https://assets.ppy.sh/beatmaps/{res['beatmapset_id']}/covers/cover.jpg",
         )
