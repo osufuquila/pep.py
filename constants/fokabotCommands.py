@@ -11,6 +11,7 @@ from collections import namedtuple
 from datetime import datetime
 from datetime import timedelta
 from typing import Callable
+from helpers import user_helper
 
 import osupyparser
 import requests
@@ -597,34 +598,43 @@ def unban(fro, chan, message):
     return f"Welcome back {target}!"
 
 
+REASON_REGEX = re.compile('(".+") (".+")')
 @registerCommand(
     trigger="!restrict",
-    syntax="<target>",
+    syntax='<target> "summary" "detail"',
     privs=privileges.ADMIN_BAN_USERS,
 )
 def restrict(fro, chan, message):
     """Restricts a specific user."""
     # Get parameters
-    target = username_safe(" ".join(message))
+    target = username_safe(message[0])
+    matched = REASON_REGEX.match(" ".join(message))
+    if not matched:
+        return "Please specify both a reason and a summary for the ban."
+    summary = matched.group(1)
+    detail = matched.group(2)
 
     # Make sure the user exists
     targetUserID = userUtils.getIDSafe(target)
     userID = userUtils.getID(fro)
     if not targetUserID:
-        return f"{target}: user not found"
-    if targetUserID in (999, 1000):
-        return "NO!"
+        return f"Could not find the user '{target}' on the server."
+    
 
-    # Put this user in restricted mode
-    userUtils.restrict(targetUserID)
+    user_helper.restrict_with_log(
+        targetUserID,
+        summary,
+        detail,
+        False,
+        userID,
+    )
 
     # Send restricted mode packet to this user if he's online
     targetToken = glob.tokens.getTokenFromUsername(username_safe(target), safe=True)
     if targetToken is not None:
         targetToken.notify_restricted()
 
-    log.rap(userID, f"has put {target} in restricted mode", True)
-    return f"Bye bye {target}. See you later, maybe."
+    return f"{target} has been successfully restricted for "
 
 
 @registerCommand(
