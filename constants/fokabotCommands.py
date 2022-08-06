@@ -11,6 +11,7 @@ from collections import namedtuple
 from datetime import datetime
 from datetime import timedelta
 from typing import Callable
+from typing import Optional
 
 import osupyparser
 import requests
@@ -32,6 +33,7 @@ from constants import serverPackets
 from constants import slotStatuses
 from helpers import chatHelper as chat
 from helpers import systemHelper
+from helpers import user_helper
 from helpers.status_helper import UserStatus
 from helpers.user_helper import restrict_with_log
 from helpers.user_helper import username_safe
@@ -45,7 +47,9 @@ commands = {}
 Command = namedtuple("Command", ["trigger", "callback", "syntax", "privileges"])
 
 
-def registerCommand(trigger: str, syntax: str = None, privs: privileges = None):
+def registerCommand(
+    trigger: str, syntax: Optional[str] = None, privs: Optional[int] = None,
+):
     """A decorator to set commands into list."""
     global commands
 
@@ -124,7 +128,7 @@ def mirrorMessage(beatmapID):
     )
 
 
-def restartShutdown(restart):
+def restartShutdown(restart: bool):
     """Restart (if restart = True) or shutdown (if restart = False) pep.py safely"""
     msg = "We are performing some maintenance. Bancho will {} in 5 seconds. Thank you for your patience.".format(
         "restart" if restart else "shutdown",
@@ -307,7 +311,7 @@ def editMap(fro: str, chan: str, message: list[str]) -> str:
             url=f"https://ussr.pl/beatmaps/{token.tillerino[0]}",
             icon_url=f"https://a.ussr.pl/{token.userID}",
         )
-        embed.set_footer(text="via RealistikPanel!")
+        embed.set_footer(text="via pep.py!")
         embed.set_image(
             url=f"https://assets.ppy.sh/beatmaps/{res['beatmapset_id']}/covers/cover.jpg",
         )
@@ -597,34 +601,44 @@ def unban(fro, chan, message):
     return f"Welcome back {target}!"
 
 
+REASON_REGEX = re.compile('(".+") (".+")')
+
+
 @registerCommand(
     trigger="!restrict",
-    syntax="<target>",
+    syntax='<target> "summary" "detail"',
     privs=privileges.ADMIN_BAN_USERS,
 )
 def restrict(fro, chan, message):
     """Restricts a specific user."""
     # Get parameters
-    target = username_safe(" ".join(message))
+    target = username_safe(message[0])
+    matched = REASON_REGEX.match(" ".join(message))
+    if not matched:
+        return "Please specify both a reason and a summary for the ban."
+    summary = matched.group(1)
+    detail = matched.group(2)
 
     # Make sure the user exists
     targetUserID = userUtils.getIDSafe(target)
     userID = userUtils.getID(fro)
     if not targetUserID:
-        return f"{target}: user not found"
-    if targetUserID in (999, 1000):
-        return "NO!"
+        return f"Could not find the user '{target}' on the server."
 
-    # Put this user in restricted mode
-    userUtils.restrict(targetUserID)
+    user_helper.restrict_with_log(
+        targetUserID,
+        summary,
+        detail,
+        False,
+        userID,
+    )
 
     # Send restricted mode packet to this user if he's online
     targetToken = glob.tokens.getTokenFromUsername(username_safe(target), safe=True)
     if targetToken is not None:
         targetToken.notify_restricted()
 
-    log.rap(userID, f"has put {target} in restricted mode", True)
-    return f"Bye bye {target}. See you later, maybe."
+    return f"{target} has been successfully restricted for '{summary}'"
 
 
 @registerCommand(
