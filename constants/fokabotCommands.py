@@ -47,7 +47,9 @@ commands = {}
 Command = namedtuple("Command", ["trigger", "callback", "syntax", "privileges"])
 
 
-def registerCommand(trigger: str, syntax: Optional[str] = None, privs: Optional[int] = None):
+def registerCommand(
+    trigger: str, syntax: Optional[str] = None, privs: Optional[int] = None,
+):
     """A decorator to set commands into list."""
     global commands
 
