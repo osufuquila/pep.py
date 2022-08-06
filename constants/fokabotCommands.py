@@ -613,11 +613,10 @@ def restrict(fro, chan, message):
     """Restricts a specific user."""
     # Get parameters
     target = username_safe(message[0])
-    matched = REASON_REGEX.match(" ".join(message))
+    matched = REASON_REGEX.findall(" ".join(message))
     if not matched:
         return "Please specify both a reason and a summary for the ban."
-    summary = matched.group(1)
-    detail = matched.group(2)
+    summary, detail = matched[0]
 
     # Make sure the user exists
     targetUserID = userUtils.getIDSafe(target)
