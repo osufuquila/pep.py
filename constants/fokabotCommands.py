@@ -634,7 +634,7 @@ def restrict(fro, chan, message):
     if targetToken is not None:
         targetToken.notify_restricted()
 
-    return f"{target} has been successfully restricted for "
+    return f"{target} has been successfully restricted for '{summary}'"
 
 
 @registerCommand(
