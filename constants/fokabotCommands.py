@@ -11,7 +11,6 @@ from collections import namedtuple
 from datetime import datetime
 from datetime import timedelta
 from typing import Callable
-from helpers import user_helper
 
 import osupyparser
 import requests
@@ -33,6 +32,7 @@ from constants import serverPackets
 from constants import slotStatuses
 from helpers import chatHelper as chat
 from helpers import systemHelper
+from helpers import user_helper
 from helpers.status_helper import UserStatus
 from helpers.user_helper import restrict_with_log
 from helpers.user_helper import username_safe
@@ -599,6 +599,8 @@ def unban(fro, chan, message):
 
 
 REASON_REGEX = re.compile('(".+") (".+")')
+
+
 @registerCommand(
     trigger="!restrict",
     syntax='<target> "summary" "detail"',
@@ -619,7 +621,6 @@ def restrict(fro, chan, message):
     userID = userUtils.getID(fro)
     if not targetUserID:
         return f"Could not find the user '{target}' on the server."
-    
 
     user_helper.restrict_with_log(
         targetUserID,
