@@ -75,7 +75,7 @@ def refresh_bmap(md5: str) -> None:
 
 def calc_completion(bmapid, n300, n100, n50, miss):
     bmap = osupyparser.OsuFile(
-        f"/home/realistikosu/ussr/.data/maps/{bmapid}.osu",
+        f"/root/fuquila/ussr/.data/maps/{bmapid}.osu",
     ).parse_file()
 
     total_hits = int(n300 + n100 + n50 + miss)
@@ -453,7 +453,7 @@ def fokabotReconnect(fro, chan, message):
     """Forces the bot to reconnect."""
     # Check if the bot is already connected
     if glob.tokens.getTokenFromUserID(999) is not None:
-        return f"{glob.BOT_NAME} is already connected to RealistikOsu!"
+        return f"{glob.BOT_NAME} is already connected to Fuquila!"
 
     # Bot is not connected, connect it
     fokabot.connect()
@@ -462,10 +462,10 @@ def fokabotReconnect(fro, chan, message):
 
 @registerCommand(trigger="!bot reload", privs=privileges.ADMIN_MANAGE_SERVERS)
 def reload_commands(fro, chan, mes) -> str:
-    """Reloads all of the RealistikBot commands."""
+    """Reloads all of the FuquilaBot commands."""
 
     fokabot.reload_commands()
-    return "RealistikBot has been reloaded successfully!"
+    return "FuquilaBot has been reloaded successfully!"
 
 
 @registerCommand(
@@ -639,90 +639,6 @@ def restrict(fro, chan, message):
 
     return f"{target} has been successfully restricted for '{summary}'"
 
-
-@registerCommand(
-    trigger="!freeze",
-    syntax="<target>",
-    privs=privileges.ADMIN_MANAGE_USERS,
-)
-def freeze(fro, chan, message):
-    """Freezes a specific user."""
-    target = username_safe(" ".join(message))
-
-    # Make sure the user exists
-    targetUserID = userUtils.getIDSafe(target)
-    userID = userUtils.getID(fro)
-    if not targetUserID:
-        return f"{target}: user not found"
-
-    # Get date & prepare freeze date
-    now = datetime.now()
-    freezedate = now + timedelta(days=2)
-    freezedateunix = (freezedate - datetime(1970, 1, 1)).total_seconds()
-
-    # Set freeze status & date
-    glob.db.execute(
-        f"UPDATE `users`  SET `frozen` = '1' WHERE `id` = '{targetUserID}'",
-    )
-    glob.db.execute(
-        "UPDATE `users`  SET `freezedate` = '{}' WHERE `id` = '{}'".format(
-            freezedateunix,
-            targetUserID,
-        ),
-    )
-
-    targetToken = glob.tokens.getTokenFromUsername(username_safe(target), safe=True)
-    if targetToken is not None:
-        targetToken.enqueue(
-            serverPackets.notification(
-                "You have been frozen! The RealistikOsu staff team has found you suspicious and would like to request a liveplay. Visit ussr.pl for more info.",
-            ),
-        )
-
-    log.rap(userID, f"has frozen {target}", True)
-    return "User has been frozen!"
-
-
-@registerCommand(
-    trigger="!unfreeze",
-    syntax="<target>",
-    privs=privileges.ADMIN_MANAGE_USERS,
-)
-def unfreeze(fro, chan, message):
-    """Unfreezes a specific user."""
-    target = username_safe(" ".join(message))
-
-    # Make sure the user exists
-    targetUserID = userUtils.getIDSafe(target)
-    userID = userUtils.getID(fro)
-    if not targetUserID:
-        return f"{target}: user not found"
-
-    glob.db.execute(
-        f"UPDATE `users`  SET `frozen` = '0' WHERE `id` = '{targetUserID}'",
-    )
-    glob.db.execute(
-        f"UPDATE `users`  SET `freezedate` = '0' WHERE `id` = '{targetUserID}'",
-    )
-    glob.db.execute(
-        "UPDATE users  SET firstloginafterfrozen = '1' WHERE id = '{}'".format(
-            targetUserID,
-        ),
-    )
-    # glob.db.execute(f"INSERT IGNORE INTO user_badges (user, badge) VALUES ({targetUserID}), 1005)")
-
-    targetToken = glob.tokens.getTokenFromUsername(username_safe(target), safe=True)
-    if targetToken is not None:
-        targetToken.enqueue(
-            serverPackets.notification(
-                "Your account has been unfrozen! You have proven your legitemacy. Thank you and have fun playing on RealistikOsu!",
-            ),
-        )
-
-    log.rap(userID, f"has unfrozen {target}", True)
-    return "User has been unfrozen!"
-
-
 @registerCommand(
     trigger="!username",
     syntax="<new username>",
@@ -846,7 +762,7 @@ def systemStatus(fro, chan, message):
 
     msg = "\n".join(
         (
-            "---> RealistikOsu <---",
+            "---> Fuquila <---",
             " - Realtime Server -",
             "> Running RealistikOsu pep.py fork.",
             f"> Online Users: {data['connectedUsers']}",
@@ -1023,7 +939,7 @@ def tillerinoLast(fro, chan, message):
         return False
 
     table = (
-        ("scores_ap" if token.autopiloting else "scores_relax")
+        "scores_relax"
         if token.relaxing
         else "scores"
     )
@@ -1961,7 +1877,7 @@ def help_cmd(fro, chan, message):
         help_cmd.append(f"{1+idx+(CMD_PER_PAGE*(index-1))}. - {name} - {docstr}")
 
     header = [
-        f"--- {index} of {pages} pages of commands currently available on RealistikOsu! ---",
+        f"--- {index} of {pages} pages of commands currently available on Fuquila! ---",
     ]
     if index == 1:
         help_cmd.append(

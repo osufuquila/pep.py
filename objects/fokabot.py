@@ -23,13 +23,13 @@ def connect():
     glob.BOT_NAME = userUtils.getUsername(999)
     token = glob.tokens.addToken(999)
     token.actionID = actions.WATCHING
-    token.actionText = "over RealistikOsu!"
-    token.pp = 69
-    token.accuracy = 0.69
-    token.playcount = 69
-    token.totalScore = 1337
-    token.timeOffset = 0
-    token.timezone = 24
+    token.actionText = "over Fuquila!"
+    token.pp = 123
+    token.accuracy = 0.456
+    token.playcount = 789
+    token.totalScore = 123
+    token.timeOffset = 456
+    token.timezone = 27
     token.country = 2  # this is retared, fuck it im keeping it as europe, couldnt find the uk as its ordered stupidly
     token.location = (39.01955903386848, 125.75276158057767)  # Pyongyang red square
     glob.streams.broadcast("main", serverPackets.user_presence(999))
@@ -103,7 +103,7 @@ def fokabotResponse(fro, chan, message):
                 f"There was an issue while running '{cmd.trigger}' command. \nTraceback: {tb}",
             )
             resp = [
-                "There was issue while processing your command, please report this to RealistikOsu developer!",
+                "There was issue while processing your command, please report this to a developer.",
             ]
             # Debugging for staff
             if user.admin:

@@ -526,7 +526,7 @@ class Match:
             chat.sendMessage(
                 glob.BOT_NAME,
                 chanName,
-                "Hey! Welcome to the RealistikOsu multiplayer! If you ever encounter "
+                "Hey! Welcome to the Fuquila multiplayer! If you ever encounter "
                 "a map you are unable to download through our direct, you can use the "
                 "!mirror command to get an external download link!",
             )

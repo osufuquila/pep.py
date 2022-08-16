@@ -29,7 +29,7 @@ def force_update():
 
 
 def login_banned():
-    return b"\x05\x00\x00\x04\x00\x00\x00\xff\xff\xff\xff\x18\x00\x00@\x00\x00\x00\x0b>You are banned! Please contact us on Discord (link at ussr.pl)"
+    return b"\x05\x00\x00\x04\x00\x00\x00\xff\xff\xff\xff\x18\x00\x00@\x00\x00\x00\x0b>You are banned! Please contact us on Discord (link at fuquila.net)"
 
 
 def login_locked():
@@ -38,10 +38,6 @@ def login_locked():
 
 def login_error():
     return b"\x05\x00\x00\x04\x00\x00\x00\xfb\xff\xff\xff"
-
-
-def login_cheats():
-    return b"\x18\x00\x00L\x00\x00\x00\x0bJWe don't like cheaters here at RealistikOsu! Consider yourself restricted.\x05\x00\x00\x04\x00\x00\x00\xff\xff\xff\xff"
 
 
 def verification_required():

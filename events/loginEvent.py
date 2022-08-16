@@ -23,27 +23,6 @@ from helpers.user_helper import verify_password
 from logger import log
 from objects import glob
 
-MINIMUM_CLIENT_YEAR = 2022
-
-UNFREEZE_NOTIF = serverPackets.notification(
-    "Thank you for providing a liveplay! You have proven your legitemacy and "
-    "have subsequently been unfrozen. Have fun playing RealistikOsu!",
-)
-FREEZE_RES_NOTIF = serverPackets.notification(
-    "Your window for liveplay sumbission has expired! Your account has been "
-    "restricted as per our cheating policy. Please contact staff for more "
-    "information on what can be done. This can be done via the RealistikCentral Discord server.",
-)
-FALLBACK_NOTIF = serverPackets.notification(
-    "Fallback clients are not supported by RealistikOsu. This is due to a combination of missing features "
-    "and server security. Please use a modern build of osu! to play RealistikOsu.",
-)
-OLD_CLIENT_NOTIF = serverPackets.notification(
-    f"You are using an outdated client (minimum release year {MINIMUM_CLIENT_YEAR}). "
-    "Please update your client to the latest version to play RealistikOsu.",
-)
-
-
 def handle(tornadoRequest):
     # I wanna benchmark!
     t = Timer()
@@ -85,8 +64,7 @@ def handle(tornadoRequest):
 
         # Set stuff from single query rather than many userUtils calls.
         user_db = glob.db.fetch(
-            "SELECT id, privileges, silence_end, donor_expire, frozen, "
-            "firstloginafterfrozen, freezedate FROM users "
+            "SELECT id, privileges, silence_end, donor_expire, frozen FROM users "
             "WHERE username_safe = %s LIMIT 1",
             (safe_username,),
         )
@@ -95,7 +73,7 @@ def handle(tornadoRequest):
             # Invalid username
             log.error(f"Login failed for user {username} (user not found)!")
             responseData += serverPackets.notification(
-                "RealistikOsu: This user does not exist!",
+                "This user does not exist!",
             )
             raise exceptions.loginFailedException()
 
@@ -108,7 +86,7 @@ def handle(tornadoRequest):
             # Invalid password
             log.error(f"Login failed for user {username} (invalid password)!")
             responseData += serverPackets.notification(
-                "RealistikOsu: Invalid password!",
+                "Invalid password!",
             )
             raise exceptions.loginFailedException()
 
@@ -116,7 +94,7 @@ def handle(tornadoRequest):
         if (not priv & 3 > 0) and (not priv & privileges.USER_PENDING_VERIFICATION):
             log.error(f"Login failed for user {username} (user is banned)!")
             responseData += serverPackets.notification(
-                "RealistikOsu: You have been banned!",
+                "You have been banned!",
             )
             raise exceptions.loginBannedException()
 
@@ -185,37 +163,6 @@ def handle(tornadoRequest):
             responseToken.notify_restricted()
         # responseToken.checkRestricted()
 
-        # Check if frozen
-        frozen = user_db["frozen"]
-
-        present = datetime.now()
-        readabledate = datetime.utcfromtimestamp(user_db["freezedate"]).strftime(
-            "%d-%m-%Y %H:%M:%S",
-        )
-        date2 = datetime.utcfromtimestamp(user_db["freezedate"]).strftime("%d/%m/%Y")
-        date3 = present.strftime("%d/%m/%Y")
-        passed = date2 < date3
-        if frozen and not passed:
-            responseToken.enqueue(
-                serverPackets.notification(
-                    f"The RealistikOsu staff team has found you suspicious and would like to request a liveplay. You have until {readabledate} (UTC) to provide a liveplay to the staff team. This can be done via the RealistikCentral Discord server. Failure to provide a valid liveplay will result in your account being automatically restricted.",
-                ),
-            )
-        elif frozen and passed:
-            responseToken.enqueue(FREEZE_RES_NOTIF)
-            restrict_with_log(
-                userID,
-                "Time window for liveplay expired",
-                "The time window for the user to submit a liveplay has expired. The user has been automatically restricted.",
-            )
-
-        # we thank unfrozen people
-        if not frozen and user_db["firstloginafterfrozen"]:
-            responseToken.enqueue(UNFREEZE_NOTIF)
-            glob.db.execute(
-                f"UPDATE users SET firstloginafterfrozen = 0 WHERE id = {userID}",
-            )
-
         # Send message if donor expires soon
         if responseToken.privileges & privileges.USER_DONOR:
             if donor_expire - int(time.time()) <= 86400 * 3:
@@ -225,7 +172,7 @@ def handle(tornadoRequest):
                 )
                 responseToken.enqueue(
                     serverPackets.notification(
-                        "Your supporter status expires in {}! Following this, you will lose your supporter privileges (such as the further profile customisation options, name changes or profile wipes) and will not be able to access supporter features. If you wish to keep supporting RealistikOsu and you don't want to lose your donor privileges, you can donate again by clicking on 'Donate' on our website.".format(
+                        "Your supporter status expires in {}! Following this, you will lose your supporter privileges (such as the further profile customisation options, name changes or profile wipes) and will not be able to access supporter features. If you wish to keep supporting Fuquila and you don't want to lose your donor privileges, you can donate again by clicking on 'Donate' on our website.".format(
                             expireIn,
                         ),
                     ),
@@ -262,114 +209,6 @@ def handle(tornadoRequest):
                 )
 
         log.info(f"Donor, silence and maintenence checks at {t.end_time_str()}")
-
-        # BAN CUSTOM CHEAT CLIENTS
-        # 0Ainu = First Ainu build
-        # b20190326.2 = Ainu build 2 (MPGH PAGE 10)
-        # b20190401.22f56c084ba339eefd9c7ca4335e246f80 = Ainu Aoba's Birthday Build
-        # b20191223.3 = Unknown Ainu build? (Taken from most users osuver in cookiezi.pw)
-        # b20190226.2 = hqOsu (hq-af)
-
-        # TODO: Rewrite this mess
-        # Ainu Client 2020 update
-        if tornadoRequest.request.headers.get("ainu"):
-            log.info(f"Account {userID} tried to use Ainu Client 2020!")
-            if user_restricted:
-                responseToken.enqueue(serverPackets.notification("Nice try BUDDY."))
-            else:
-                glob.tokens.deleteToken(userID)
-                restrict_with_log(
-                    userID,
-                    "Attempted login with Ainu Client 2020",
-                    "The user has attempted to log in with a the Ainu 2020 client. "
-                    "This is a known cheating client. The user has been detected through "
-                    "the ainu header sent on login. (login gate).",
-                )
-                raise exceptions.loginCheatClientsException()
-        # Ainu Client 2019
-        elif osuVersion in (
-            "0Ainu",
-            "b20190326.2",
-            "b20190401.22f56c084ba339eefd9c7ca4335e246f80",
-            "b20191223.3",
-        ):
-            log.info(f"Account {userID} tried to use Ainu Client!")
-            if user_restricted:
-                responseToken.enqueue(serverPackets.notification("Nice try BUDDY."))
-            else:
-                glob.tokens.deleteToken(userID)
-                restrict_with_log(
-                    userID,
-                    "Attempted login with Ainu Client",
-                    "The user has attempted to log in with a client which has a version "
-                    f"matching known Ainu cheating client versions ({osuVersion}). "
-                    "(login gate)",
-                )
-                raise exceptions.loginCheatClientsException()
-        # hqOsu
-        elif osuVersion == "b20190226.2":
-            log.info(f"Account {userID} tried to use hqOsu!")
-            if user_restricted:
-                responseToken.enqueue(serverPackets.notification("Comedian."))
-            else:
-                glob.tokens.deleteToken(userID)
-                restrict_with_log(
-                    userID,
-                    "Attempted login with hqOsu",
-                    "The user has attempted to log in with a client version matching "
-                    f"the default setting of the hQosu multiaccounting utility ({osuVersion}). "
-                    "(login gate)",
-                )
-                raise exceptions.loginCheatClientsException()
-
-        # hqosu legacy
-        elif osuVersion == "b20190716.5":
-            log.info(f"Account {userID} tried to use hqOsu legacy!")
-            if user_restricted:
-                responseToken.enqueue(serverPackets.notification("Comedian."))
-            else:
-                glob.tokens.deleteToken(userID)
-                restrict_with_log(
-                    userID,
-                    "Attempted login with hqOsu (legacy)",
-                    "The user has attempted to log in with a client version matching "
-                    f"the default setting of the hQosu multiaccounting utility ({osuVersion}). "
-                    "(login gate)",
-                )
-                raise exceptions.loginCheatClientsException()
-        # Budget Hacked client.
-        elif osuVersion.startswith("skoot"):
-            if user_restricted:
-                responseToken.enqueue(serverPackets.notification("Comedian."))
-            else:
-                glob.tokens.deleteToken(userID)
-                restrict_with_log(
-                    userID,
-                    "Attempted login with Skoot client.",
-                    "The user attempted to log in with the Skoot custom client. "
-                    f"This has been detected through the osu! version sent on login ({osuVersion}). "
-                    "(login gate)",
-                )
-                raise exceptions.loginCheatClientsException()
-
-        # Blanket cover for most retard clients, force update.
-        elif osuVersion[0] != "b":
-            glob.tokens.deleteToken(userID)
-            raise exceptions.haxException()
-
-        # Special case for old fallback client
-        elif osuVersion == "20160403.6":
-            glob.tokens.deleteToken(userID)
-            responseData += FALLBACK_NOTIF
-            raise exceptions.loginFailedException
-
-        # Misc outdated client check
-        elif int(osuVersion[1:5]) < MINIMUM_CLIENT_YEAR:
-            glob.tokens.deleteToken(userID)
-            responseData += OLD_CLIENT_NOTIF
-            raise exceptions.loginFailedException
-
-        log.info(f"Anticheat checks at {t.end_time_str()}")
 
         # Send all needed login packets
         responseToken.enqueue(
@@ -432,14 +271,8 @@ def handle(tornadoRequest):
         # creating notification
         t_str = t.end_time_str()
         online_users = len(glob.tokens.tokens)
-        # Wylie has his own quote he gets to enjoy only himself lmfao. UPDATE: Electro gets it too.
-        if userID in (4674, 3277):
-            quote = "I lost an S because I saw her lewd"
-        # Ced also gets his own AS HE DOESNT WANT TO CHECK FAST SPEED.
-        elif userID == 1002:
-            quote = "juSt Do iT"
-        # Me and relesto are getting one as well lmao. UPDATE: Sky and Aochi gets it too lmao.
-        elif userID in (1000, 1180, 3452, 4812):
+        # yes.
+        if userID == 1000:
             quote = (
                 f"Hello I'm RealistikBot! The server's official bot to assist you, "
                 "if you want to know what I can do just type !help"
@@ -469,9 +302,6 @@ def handle(tornadoRequest):
     except exceptions.loginLockedException:
         # Login banned error packet
         responseData += serverPackets.login_locked()
-    except exceptions.loginCheatClientsException:
-        # Banned for logging in with cheats
-        responseData += serverPackets.login_cheats()
     except exceptions.banchoMaintenanceException:
         # Bancho is in maintenance mode
         responseData = b""
@@ -504,7 +334,7 @@ def handle(tornadoRequest):
         )
         responseData += serverPackets.login_reply(-5)  # Bancho error
         responseData += serverPackets.notification(
-            "RealistikOsu: The server has experienced an error while logging you "
+            "The server has experienced an error while logging you "
             "in! Please notify the developers for help.",
         )
     finally:

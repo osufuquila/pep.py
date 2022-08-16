@@ -22,9 +22,9 @@ def printServerStartHeader(asciiArt: bool = True):
             bcolours.GREEN,
         )
 
-    print_coloured(f"# pep.py - The RealistikOsu Bancho emulator.", bcolours.BLUE)
+    print_coloured(f"# pep.py - The Fuquila Bancho emulator.", bcolours.BLUE)
     print_coloured(
-        f"# This is a fork of the now deprecated pep.py by the Ripple Team.",
+        f"# This is a fork of RealistikOsu's pep.py.",
         bcolours.BLUE,
     )
 

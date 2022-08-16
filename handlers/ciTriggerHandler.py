@@ -25,7 +25,7 @@ class handler(requestsManager.asyncRequestHandler):
 
             # Check ci key
             key = self.get_argument("k")
-            if key is None or key != glob.conf.config["server"]["cikey"]:
+            if key is None or key != glob.conf.CI_KEY:
                 raise exceptions.invalidArgumentsException()
 
             log.info("Ci event triggered!!")

@@ -103,6 +103,7 @@ class Config(ConfigReader):
     REDIS_PASSWORD: str = ""
     GZIP_LEVEL: int     = 6
     THREADS_COUNT: int  = 2
+    CI_KEY: str         = ""
     NEW_RANKED_WEBHOOK: str = ""
 
 conf = Config()

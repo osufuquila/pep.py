@@ -104,10 +104,6 @@ class UserToken:
         self.relaxing = False
         self.relaxAnnounce = False
 
-        # Autopilot
-        self.autopiloting = False
-        self.autoAnnounce = False
-
         # Generate/set token
         if token_ is not None:
             self.token = token_
@@ -538,16 +534,6 @@ class UserToken:
             self.accuracy = stats_relax["accuracy"] / 100
             self.playcount = stats_relax["playcount"]
             self.totalScore = stats_relax["totalScore"]
-
-        elif self.autopiloting:
-            stats_ap = userUtils.getUserStatsAP(self.userID, self.gameMode)
-
-            self.gameRank = stats_ap["gameRank"]
-            self.pp = stats_ap["pp"]
-            self.rankedScore = stats_ap["rankedScore"]
-            self.accuracy = stats_ap["accuracy"] / 100
-            self.playcount = stats_ap["playcount"]
-            self.totalScore = stats_ap["totalScore"]
         else:
             stats = userUtils.getUserStats(self.userID, self.gameMode)
 
@@ -606,7 +592,7 @@ class UserToken:
         chat.sendMessage(
             glob.BOT_NAME,
             self.username,
-            "Your account has been restricted! Please contact the RealistikOsu staff through our Discord server for more info!",
+            "Your account is currently in restricted mode.   Please contact us on discord for more information.",
         )
 
     def notify_unrestricted(self) -> None:

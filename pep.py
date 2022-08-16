@@ -14,7 +14,6 @@ from common.db import dbConnector
 from common.redis import pubSub
 
 from handlers import api_delta as deltaApi
-from handlers import apiAerisThing
 from handlers import apiFokabotMessageHandler
 from handlers import apiIsOnlineHandler
 from handlers import apiOnlineUsersHandler
@@ -54,7 +53,6 @@ def make_app():
             (r"/api/v1/fokabotMessage", apiFokabotMessageHandler.handler),
             (r"/api/yes/userstats", apiUserStatusHandler.handler),
             (r"/api/v2/clients/(.*)", deltaApi.handler),
-            (r"/infos", apiAerisThing.handler),
         ],
     )
 
@@ -141,7 +139,7 @@ def main():
             )
 
         # Start fokabot
-        log.info("Connecting RealistikBot...")
+        log.info("Connecting FuquilaBot...")
         fokabot.connect()
         log.info("Complete!")
 

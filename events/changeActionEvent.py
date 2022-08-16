@@ -55,28 +55,16 @@ if userToken.matchID != -1 and userToken.actionID != actions.MULTIPLAYING and us
             if not userToken.relaxing:
                 userToken.updateCachedStats()
             userToken.relaxing = True
-            userToken.autopiloting = False
-            userToken.updateCachedStats()
-        # autopiloten
-        elif packetData["actionMods"] & 8192:
-            # Only reload on mode change.
-            if not userToken.autopiloting:
-                userToken.updateCachedStats()
-            userToken.autopiloting = True
-            userToken.relaxing = False
             userToken.updateCachedStats()
         else:
-            if (not userToken.autopiloting) and (not userToken.relaxing):
+            if not userToken.relaxing:
                 userToken.updateCachedStats()
             userToken.relaxing = False
-            userToken.autopiloting = False
             userToken.updateCachedStats()
 
     prefix = "VN"
     if userToken.relaxing:
         prefix = "RX"
-    elif userToken.autopiloting:
-        prefix = "AP"
 
     # User Statuses! Apply only on IDLE/AFK
     if userToken.actionID in (0, 1):
